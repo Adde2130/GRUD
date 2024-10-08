@@ -1,0 +1,9 @@
+# Virtual Environment
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+
+# Python bytecode files
+__pycache__/
+*.pyc
