@@ -33,10 +33,9 @@ class GRUDApp:
 
         if gui:
             self.initGUI()
-            self.getDrives()
+            self.getDrivesContent()
 
         
-
     def initGUI(self):
         self.root = tk.Tk()
         self.root.title("GRUD")
@@ -59,7 +58,7 @@ class GRUDApp:
         self.listbox.grid(row=1,column=1, rowspan=7, columnspan=1, padx= 20, pady=20)
 
         # Buttons
-        self.refresh_button = tk.Button(self.root, text="REFRESH DRIVES", command=self.getDrives, padx=8, pady=0, font=("Gotham", 8))
+        self.refresh_button = tk.Button(self.root, text="REFRESH DRIVES", command=self.getDrivesContent, padx=8, pady=0, font=("Gotham", 8))
         self.refresh_button.grid(row=5,column=2,sticky="S", rowspan=1, columnspan=3)
         self.open_drives_button = tk.Button(self.root, text="GO TO DRIVES", command=self.openThisPC, padx=10, pady=0, font=("Gotham", 8))
         self.open_drives_button.grid(row=7,column=2,sticky="N", rowspan=1, columnspan=3)
@@ -85,47 +84,42 @@ class GRUDApp:
 
 
     # Open a file dialog to select a folder
-    def getDrives(self):
+    def getDrivesContent(self):
         self.listbox.delete(0, tk.END)
-        msg = "start"
         folderStatus = ""
-            # List all files and directories in the selected path with full paths
-        for item in self.drives:
-            print(msg)
-            numFolderFound = False
+
+        for drive in self.drives:
+            wiiNum = 0
+
             slpFolderFound = False
-            for content in os.listdir(item):
-                
+            for content in os.listdir(drive):
                 if content.isdigit():
                     wiiNum = content
-                    numFolderFound = True
+                    continue
 
                 if content == "Slippi":
                     slpFolderFound = True
-                        
+                    continue
                     
-                        #print(finalItem)
-                        #print(os.path.join(item,content), wiiNum, slpMsg)
-                if numFolderFound == True and slpFolderFound == True:
-                    numOfFiles= sum(1 for d in Path(os.path.join(item, content)).iterdir() if Path(os.path.join(item, content)).is_file())
-                    print(os.path.join(item, content))
-                    slpMsg = f"{numOfFiles} files"
-                    if slpMsg == "0 files":
-                        slpMsg = "Replay folder empty!"
-                    break
-               
-            
-            if numFolderFound == False or slpFolderFound == False:
-                if numFolderFound == True:
-                    slpMsg = '"Slippi" replay folder missing!'
+
+            if wiiNum == 0:
+                slpMsg = "Numbered folder missing!"
+                wiiNum = "?"
+            elif not slpFolderFound:
+                slpMsg = '"Slippi" replay folder missing!'
+            else:
+                file_count = len(os.listdir(f"{drive}/Slippi"))
+                if not file_count:
+                    slpMsg = "Replay folder empty!"
                 else:
-                    slpMsg = "Numbered folder missing!"
-                    wiiNum = "?"
+                    slpMsg = f"{file_count}"
+
             if content == "Slippi":
                 dirName = "Slippi"
             else:
                 dirName = "??????"
-            self.listbox.insert(tk.ACTIVE,os.path.join(item, dirName) + " Wii#" + wiiNum + " ----- " + slpMsg + folderStatus)
+
+            self.listbox.insert(tk.ACTIVE,os.path.join(drive, dirName) + " Wii#" + wiiNum + " ----- " + slpMsg + folderStatus)
 
     def openThisPC(self):
         if os.name == "nt":
