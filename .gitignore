@@ -1,8 +1,5 @@
 # Virtual Environment
-Include/
-Lib/
-Scripts/
-pyvenv.cfg
+.venv/
 
 # Python bytecode files
 __pycache__/
