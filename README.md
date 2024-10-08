@@ -1,6 +1,6 @@
 # GRUD
 
-## **G**ame **R**eplay **U**ploader for **D**iscord
+**G**ame **R**eplay **U**ploader for **D**iscord
 
 Script created by Hixon in order to download replays from USB drives en masse and upload them.
 
