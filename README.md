@@ -6,7 +6,7 @@ Script created by Hixon in order to download replays from USB drives en masse an
 
 ## How to use
 
-1. Run grub, either by launching `grub.bat` or by running `main.py` with python. Run it with the flag `-n` or `--naked` to 
+1. Run grud, either by launching `grud.bat` or by running `main.py` with python. Run it with the flag `-n` or `--naked` to 
 use the program without any GUI.  
 
 2. Check the list of drives to see if all Slippi replay folders are detected. If a directory or drive is missing, press 

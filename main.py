@@ -39,6 +39,7 @@ class GRUDApp:
             self.initGUI()
 
         self.getDrivesContent()
+
         
     def initGUI(self):
         self.root = tk.Tk()
@@ -71,14 +72,13 @@ class GRUDApp:
 
 
     def download_button(self):
-        download_path = filedialog.askdirectory(
-            title="Select a Directory"
-        )
+        download_path = filedialog.askdirectory(title="Select a Directory")
 
         if download_path:
             print(f"Selected directory path: {download_path}")
         
         self.download(download_path)
+
         
     def download(self, download_path):
         asyncio.run(self.transferReplays(download_path))
@@ -89,13 +89,14 @@ class GRUDApp:
 
             print(f"Zipping {folder}...")
             path = f"{download_path}/{folder}"
-            with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_DEFLATED) as zipf:
+            with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_DEFLATED, compresslevel=8) as zipf:
                 for file in os.listdir(path):
                     zipf.write(f"{path}/{file}", arcname=file)
 
             shutil.rmtree(path)
 
         print("Done!")
+
 
     # Open a file dialog to select a folder
     def getDrivesContent(self):
@@ -109,6 +110,8 @@ class GRUDApp:
 
             slpFolderFound = False
             workingDrive = False
+            
+            replayPath = f"{drive}Slippi"
             for content in os.listdir(drive):
                 if content.isdigit():
                     wiiNum = content
@@ -125,31 +128,32 @@ class GRUDApp:
             elif not slpFolderFound:
                 slpMsg = '"Slippi" replay folder missing!'
             else:
-                file_count = len(os.listdir(f"{drive}/Slippi"))
+                file_count = len(os.listdir(replayPath))
                 if not file_count:
                     slpMsg = "Replay folder empty!"
                 else:
                     slpMsg = f"{file_count}"
                     workingDrive = True
 
-            if content == "Slippi":
-                dirName = "Slippi"
-            else:
-                dirName = "??????"
 
             if workingDrive:
-                slippiFolders[wiiNum] = f"{drive}/Slippi"
-                
+                slippiFolders[wiiNum] = replayPath
+                dirName = replayPath
+            else:
+                dirName = f"{drive}?????"
+
             if self.gui:
-                self.listbox.insert(tk.ACTIVE,os.path.join(drive, dirName) + " Wii#" + wiiNum + " ----- " + slpMsg + folderStatus)
+                self.listbox.insert(tk.ACTIVE, dirName + " Wii#" + wiiNum + " ----- " + slpMsg + folderStatus)
+
 
     def openThisPC(self):
         if os.name == "nt":
             subprocess.Popen("explorer.exe shell:MyComputerFolder")  
+            
 
     async def transferReplays(self, dest: str):
         if not os.path.exists(dest):
-            print(f"Path {dest} does not exist")
+            print(f"Destination path '{dest}' does not exist")
             return
 
         if len(slippiFolders) == 0:
@@ -164,6 +168,7 @@ class GRUDApp:
                 shutil.move(src, setupPath)
             print(f"Wii {wiiNum} complete")
             await asyncio.sleep(0)
+
 
 def main():
     # Parse arguments
