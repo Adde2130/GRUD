@@ -6,12 +6,16 @@ import string
 import subprocess
 import argparse
 import json
+import asyncio
+import shutil
+import zipfile
 
 from pathlib import Path
 
 drives = []
 drive_path = []
 drive_number = []
+slippiFolders = {}
 
 class GRUDApp:
     def __init__(self, gui=True, tourney_name="", edition=""):
@@ -33,8 +37,8 @@ class GRUDApp:
 
         if gui:
             self.initGUI()
-            self.getDrivesContent()
 
+        self.getDrivesContent()
         
     def initGUI(self):
         self.root = tk.Tk()
@@ -62,36 +66,49 @@ class GRUDApp:
         self.refresh_button.grid(row=5,column=2,sticky="S", rowspan=1, columnspan=3)
         self.open_drives_button = tk.Button(self.root, text="GO TO DRIVES", command=self.openThisPC, padx=10, pady=0, font=("Gotham", 8))
         self.open_drives_button.grid(row=7,column=2,sticky="N", rowspan=1, columnspan=3)
-        self.download_button = tk.Button(self.root, text="DOWNLOAD", command=self.download, padx=20, pady=10, font=("Gotham", 8))
+        self.download_button = tk.Button(self.root, text="DOWNLOAD", command=self.download_button, padx=20, pady=10, font=("Gotham", 8))
         self.download_button.grid(row=6,column=2, rowspan=1, columnspan=3)
 
 
-    def hasReplayFolder(self, folderName):
-        if folderName != "Slippi":
-            return "No folder named Slippi!"
-        else:
-            return ""
-
-
-    def download(self):
+    def download_button(self):
         download_path = filedialog.askdirectory(
             title="Select a Directory"
         )
 
         if download_path:
             print(f"Selected directory path: {download_path}")
-        return download_path
+        
+        self.download(download_path)
+        
+    def download(self, download_path):
+        asyncio.run(self.transferReplays(download_path))
 
+        for folder in os.listdir(download_path):
+            if not "Setup #" in folder:
+                continue
+
+            print(f"Zipping {folder}...")
+            path = f"{download_path}/{folder}"
+            with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_DEFLATED) as zipf:
+                for file in os.listdir(path):
+                    zipf.write(f"{path}/{file}", arcname=file)
+
+            shutil.rmtree(path)
+
+        print("Done!")
 
     # Open a file dialog to select a folder
     def getDrivesContent(self):
-        self.listbox.delete(0, tk.END)
+        if self.gui:
+            self.listbox.delete(0, tk.END)
+
         folderStatus = ""
 
         for drive in self.drives:
             wiiNum = 0
 
             slpFolderFound = False
+            workingDrive = False
             for content in os.listdir(drive):
                 if content.isdigit():
                     wiiNum = content
@@ -113,18 +130,40 @@ class GRUDApp:
                     slpMsg = "Replay folder empty!"
                 else:
                     slpMsg = f"{file_count}"
+                    workingDrive = True
 
             if content == "Slippi":
                 dirName = "Slippi"
             else:
                 dirName = "??????"
 
-            self.listbox.insert(tk.ACTIVE,os.path.join(drive, dirName) + " Wii#" + wiiNum + " ----- " + slpMsg + folderStatus)
+            if workingDrive:
+                slippiFolders[wiiNum] = f"{drive}/Slippi"
+                
+            if self.gui:
+                self.listbox.insert(tk.ACTIVE,os.path.join(drive, dirName) + " Wii#" + wiiNum + " ----- " + slpMsg + folderStatus)
 
     def openThisPC(self):
         if os.name == "nt":
             subprocess.Popen("explorer.exe shell:MyComputerFolder")  
-            
+
+    async def transferReplays(self, dest: str):
+        if not os.path.exists(dest):
+            print(f"Path {dest} does not exist")
+            return
+
+        if len(slippiFolders) == 0:
+            print("No USB drives to download from!")
+            return
+
+        for wiiNum, slippiFolder in slippiFolders.items():
+            setupPath = f"{dest}/Setup #{wiiNum}"
+            os.makedirs(setupPath, exist_ok=True)
+            for file in os.listdir(slippiFolder):
+                src = f"{slippiFolder}/{file}"
+                shutil.move(src, setupPath)
+            print(f"Wii {wiiNum} complete")
+            await asyncio.sleep(0)
 
 def main():
     # Parse arguments
@@ -139,14 +178,18 @@ def main():
 
         app = GRUDApp(
                 gui=not args.naked, 
-                tourney_name = settings["TourneyName"],
-                edition = settings["Edition"]
+                tourney_name=settings["TourneyName"],
+                edition=settings["Edition"]
             )
     else:
         app = GRUDApp(gui=not args.naked)
 
     if(not args.naked):
         app.root.mainloop()
+    else:
+        dest = os.path.dirname(os.path.abspath(__file__)) + "/Replays"
+        os.makedirs(dest, exist_ok=True)
+        app.download(dest)
 
 
 if __name__ == "__main__":

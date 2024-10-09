@@ -6,8 +6,6 @@ Script created by Hixon in order to download replays from USB drives en masse an
 
 ## How to use
 
-**NOTE:** As of right now, this is WIP and won't produce any results.  
-
 1. Run grub, either by launching `grub.bat` or by running `main.py` with python. Run it with the flag `-n` or `--naked` to 
 use the program without any GUI.  
 
@@ -17,7 +15,10 @@ use the program without any GUI.
 3. Choose a name for the tournament and the edition number. By default, these will be set to whatever the ***"TourneyEdition"***
 and ***"Edition"*** are set to in `settings.json`.
 
-4. Click **DOWNLOAD** to and choose a directory to download the replays to. 
+4. Click **DOWNLOAD** to and choose a directory to download the replays to. You will find Zip archives of each setup, called
+Setup #NUM, where NUM is the number of the setup.
+
+**TODO:** Make this upload the replays to discord using a bot
 
 ## Installing
 
