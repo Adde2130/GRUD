@@ -4,3 +4,7 @@
 # Python bytecode files
 __pycache__/
 *.pyc
+
+# Test files
+test.py
+test_files/

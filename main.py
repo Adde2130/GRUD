@@ -10,7 +10,7 @@ import asyncio
 import shutil
 import zipfile
 
-from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor 
 
 drives = []
 drive_path = []
@@ -76,24 +76,28 @@ class GRUDApp:
 
         if download_path:
             print(f"Selected directory path: {download_path}")
-        
-        self.download(download_path)
+            self.download(download_path)
+
+        self.getDrivesContent()
 
         
     def download(self, download_path):
         asyncio.run(self.transferReplays(download_path))
 
-        for folder in os.listdir(download_path):
-            if not "Setup #" in folder:
-                continue
+        folders_to_zip = [folder for folder in os.listdir(download_path) if "Setup #" in folder]
 
-            print(f"Zipping {folder}...")
-            path = f"{download_path}/{folder}"
-            with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_DEFLATED, compresslevel=8) as zipf:
-                for file in os.listdir(path):
-                    zipf.write(f"{path}/{file}", arcname=file)
+        print("Zipping...")
 
-            shutil.rmtree(path)
+        with ProcessPoolExecutor() as executor:
+
+            tasks = [
+                executor.submit(compressFolder, f"{download_path}/{folder}")
+                for folder in folders_to_zip
+            ]
+
+            # Wait for tasks to complete...
+            for task in tasks:
+                task.result()
 
         print("Done!")
 
@@ -168,6 +172,16 @@ class GRUDApp:
                 shutil.move(src, setupPath)
             print(f"Wii {wiiNum} complete")
             await asyncio.sleep(0)
+
+
+def compressFolder(path):
+    with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_LZMA, compresslevel=9) as zipf:
+        for file in os.listdir(path):
+            zipf.write(f"{path}/{file}", arcname=file)
+
+        shutil.rmtree(path)
+
+    print(f"{path} zipped")
 
 
 def main():
