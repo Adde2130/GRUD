@@ -5,6 +5,10 @@
 Script created by Hixon in order to download replays from USB drives en masse and upload them.
 
 ## How to use
+0. Configure your settings first. The `GRUDBot_APIKEY` and `ReplayChannelID` values are required for
+the bot to send the message to your channel. You also need to add the GRUDBot. ***Right now, you will
+have to host your OWN GRUDBot for this to work.*** Don't forget to also set the `FileSizeLimit` allowed per
+message if your channel doesn't have any discord channel boosts.
 
 1. Run grud, either by launching `grud.bat` or by running `main.py` with python. Run it with the flag `-n` or `--naked` to 
 use the program without any GUI.  
@@ -16,9 +20,7 @@ use the program without any GUI.
 and ***"Edition"*** are set to in `settings.json`.
 
 4. Click **DOWNLOAD** to and choose a directory to download the replays to. You will find Zip archives of each setup, called
-Setup #NUM, where NUM is the number of the setup.
-
-**TODO:** Make this upload the replays to discord using a bot
+Setup #NUM, where NUM is the number of the setup. The discord bot will send a message to the channel ID given.
 
 ## Installing
 
