@@ -1,1 +1,2 @@
+customtkinter==5.2.2
 discord.py==2.4.0
