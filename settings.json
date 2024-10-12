@@ -1,8 +1,0 @@
-{
-	"TourneyName" : "Test",
-	"Edition" : 123,
-
-	"GRUDBot_APIKEY" : "YOUR_KEY_HERE",
-	"ReplayChannelID" : 0,
-	"FileSizeLimit" : 50
-}

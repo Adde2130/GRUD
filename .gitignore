@@ -5,5 +5,7 @@
 __pycache__/
 *.pyc
 
+settings.json
+
 # Test files
 test*
