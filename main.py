@@ -279,6 +279,7 @@ class GRUDApp:
             return
 
         folders_to_send = []
+        size_limt = self.grudbot.replay_channel.guild.filesize_limit # :D
 
         with ProcessPoolExecutor() as executor:
 
@@ -286,7 +287,7 @@ class GRUDApp:
                 executor.submit(
                     compress.compress_folder,
                     f"{download_path}/{folder}", 
-                    self.settings["FileSizeLimit"] * 1024 * 1024
+                    size_limit
                     )
                 for folder in folders_to_zip
             ]
@@ -480,7 +481,6 @@ def main():
             "GRUDBot_APIKEY" : "",
             "ReplayChannelID" : 0,
             "DefaultDownloadPath" : "",
-            "FileSizeLimit" : 25
         }
 
         settings_object = json.dumps(settings_json, indent=4)

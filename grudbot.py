@@ -57,3 +57,4 @@ class GRUDBot(Bot):
         if message == "":
             return
         await self.replay_channel.send(content=message)
+
