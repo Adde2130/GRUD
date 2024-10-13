@@ -2,7 +2,10 @@
 
 **G**ame **R**eplay **U**ploader for **D**iscord
 
-Script created by Hixon in order to download replays from USB drives en masse and upload them.
+Script created in order to download replays from USB drives en masse and upload them.
+(Shoutout to Hixon for the name and idea)
+
+**NOTE:** As of right now, grud from the terminal is broken and should not be used
 
 ## How to use
 0. Configure your settings first. The `GRUDBot_APIKEY` and `ReplayChannelID` values are required for

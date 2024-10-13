@@ -70,8 +70,6 @@ class GRUDApp:
         self.root.resizable(False, False)
         self.root.configure(bg=COLORS["GRAY"])
 
-        self.root.tk.call("font", "create", "CascadiaCode", "-family", "CascadiaCode")
-
         # Choose path
         self.checkbox = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
                                            text="Keep copy?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
@@ -186,13 +184,12 @@ class GRUDApp:
                 self.disable_widget("checkbox") 
                 self.disable_widget("path") 
 
-                if not self.anim_counter % 13:
-                    print(self.status_message)
-                    text = dotdotdot(self.status_message, self.anim_counter / 13 % 3 + 1)
-                    self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
+                text = dotdotdot(self.status_message, self.anim_counter / 13 % 3 + 1)
+                self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
             case _:
                 pass
 
+        self.refresh_drives()
         self.root.after(30, self.update_status)
 
     def update_misc(self):
@@ -231,8 +228,6 @@ class GRUDApp:
         self.refresh_button.config(state=tk.DISABLED)
         self.checkbox.configure(state=tk.DISABLED)
         self.path_button.configure(state=tk.DISABLED)
-
-        self.refresh_drives()
 
 
     def select_path(self):
