@@ -37,25 +37,34 @@ class GRUDApp:
 
         self.settings = settings
         self.download_thread = None
-        self.download_thread = None
 
-        self.state = "connecting"
-        self.status_message = "Connecting"
+        if self.settings is None:
+            self.settings = {
+                "GRUDBot_APIKEY" : "",
+                "ReplayChannelID" : 0,
+                "DefaultDownloadPath" : ""
+            }
+
+            self.state = "invalid_settings"
+        else:
+            self.state = "connecting"
+
 
         # Fix download path
-        self.download_path = settings["DefaultDownloadPath"].replace("\\", "/")
+        self.download_path = self.settings["DefaultDownloadPath"].replace("\\", "/")
         if not self.download_path or not os.path.isdir(self.download_path):
             self.download_path = ""
 
-
+        
         # Check for windows
         if os.name == "nt":
             self.drives = [f"{d}:\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\")]
         else:
-            print("Only Windows is supported in this version of GRUD")
+            printerror("Only Windows is supported in this version of GRUD")
             exit(1)
 
-        self.start_grudbot()
+        if self.state == "connecting":
+            self.start_grudbot()
 
         if gui:
             self.initGUI()
@@ -108,7 +117,7 @@ class GRUDApp:
         self.refresh_button = tk.Button(self.root, text="REFRESH DRIVES", command=self.refresh_drives,
                                         padx=8, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["LIGHT_GREEN"], cursor="hand2")
         self.refresh_button.grid(row=9,column=0,sticky="W", rowspan=1, columnspan=3, padx=20)
-        self.open_drives_button = tk.Button(self.root, text="GO TO DRIVES", command=self.openThisPC,
+        self.open_drives_button = tk.Button(self.root, text="GO TO DRIVES", command=self.open_drives,
                                             padx=10, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["YELLOW"], cursor="hand2")
         self.open_drives_button.grid(row=9,column=1,sticky="W", rowspan=1, columnspan=3, padx=295)
         self.download_button = tk.Button(self.root, text="DOWNLOAD", command=self.download_action, padx=20,
@@ -136,6 +145,8 @@ class GRUDApp:
         
         match self.state:
             case "connecting":
+                self.status_message = "Connecting"
+
                 self.disable_widget("download")
 
                 if self.grudbot.error == "LoginFailure":
@@ -159,6 +170,13 @@ class GRUDApp:
                     text = dotdotdot(self.status_message, self.anim_counter / 13 % 3 + 1)
                     self.bot_status.configure(text=text)
 
+            case "invalid_settings":
+                self.disable_widget("download")
+                self.status_message = "Invalid settings.json!\nCheck your syntax"
+                self.bot_status.grid_forget()
+                self.bot_status.configure(text=self.status_message, text_color=COLORS["RED"])
+                self.bot_status.grid(row=2, column=2, padx=30)
+
             case "ready":
                 self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"])
 
@@ -176,6 +194,7 @@ class GRUDApp:
                         self.disable_widget("download")
                 else:
                     self.disable_widget("path")
+
             case "transfering" | "zipping" | "sending":
 
                 self.disable_widget("download") 
@@ -192,21 +211,6 @@ class GRUDApp:
         self.refresh_drives()
         self.root.after(30, self.update_status)
 
-    def update_misc(self):
-        if self.checkbox.get() == 1:
-            self.path_button.config(state=tk.NORMAL)
-        else:
-            self.path_button.config(state=tk.DISABLED)
-
-        # Download button
-        if self.grudbot.connected is False:
-            self.download_button.config(state=tk.DISABLED, bg="white")
-        elif self.checkbox.get() == 1 and self.download_path == "":
-            self.download_button.config(state=tk.DISABLED, bg="white")
-        else:
-            self.download_button.config(state=tk.NORMAL, bg=COLORS["BLUE"])
-
-        self.root.after(30, self.update_misc)
 
     def download_action(self):
         message = self.msg_box.get("1.0", tk.END).strip()
@@ -266,10 +270,8 @@ class GRUDApp:
                 printerror(f"The zip file {folder} already exists at this location. TODO: HANDLE THIS")
                 folders_to_remove.append(folder)
         
-        print(folders_to_zip)
         for folder in folders_to_remove:
             # Remove BOTH the zip file and the folder from the list
-            print(folder)
             folders_to_zip.remove(folder[:-4])
             folders_to_zip.remove(folder)
 
@@ -370,7 +372,7 @@ class GRUDApp:
 
     
 
-    def openThisPC(self):
+    def open_drives(self):
         if os.name == "nt":
             subprocess.Popen("explorer.exe shell:MyComputerFolder")  
 
@@ -404,11 +406,11 @@ class GRUDApp:
 
     async def transfer_replays(self, dest: str):
         if not os.path.exists(dest):
-            print(f"Destination path '{dest}' does not exist")
+            printerror(f"Destination path '{dest}' does not exist")
             return
 
         if len(slippi_folders) == 0:
-            print("No USB drives to download from!")
+            printerror("No USB drives to download from!")
             return
 
         tasks = [
@@ -467,8 +469,11 @@ def main():
     # Parse settings
     if os.path.isfile("settings.json"):
         with open("settings.json", "r") as file:
-            settings = json.load(file)
-
+            try:
+                settings = json.load(file)
+            except json.decoder.JSONDecodeError as e:
+                settings = None
+                printerror(e)
 
         app = GRUDApp(
                 gui=not args.naked, 
@@ -480,7 +485,7 @@ def main():
         settings_json = {
             "GRUDBot_APIKEY" : "",
             "ReplayChannelID" : 0,
-            "DefaultDownloadPath" : "",
+            "DefaultDownloadPath" : ""
         }
 
         settings_object = json.dumps(settings_json, indent=4)

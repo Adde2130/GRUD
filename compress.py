@@ -18,7 +18,7 @@ def __divide_chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i+n]
 
-def get_folder_size(path: str):
+def get_folder_size(path: str) -> int:
     size = 0
     for file in os.listdir(path):
         file_path = os.path.join(path, file)
@@ -40,7 +40,8 @@ def compress_folder(path: str, size_limit: int) -> int: # Returns number of arch
             while size * LZMA_RATIO / archives > size_limit * MARGIN:
                 archives += 1
                 if archives > 5:
-                    print("DISASTER WHILE TRYING TO COMPRESS. TELL ADDE")
+                    print("\033[91mDISASTER WHILE TRYING TO COMPRESS. TELL ADDE\033[0m")
+                    print(f"File size: {size}")
                     return 0
 
     if archives == 1: # Create one archive. Easy.

@@ -27,7 +27,7 @@ class GRUDBot(Bot):
                 self.replay_channel = await self.fetch_channel(self.replay_channel_id)
                 if self.replay_channel is None:
                     self.error = "ChannelNotFound"
-                    print("WARNING: We didn't find a channel, yet an error wasn't raised???")
+                    print("\033[91mWARNING: We didn't find a channel, yet an error wasn't raised???\033[0m")
 
         except NotFound as e:
             self.error = "ChannelNotFound"
@@ -45,7 +45,7 @@ class GRUDBot(Bot):
                 await self.replay_channel.send(file=discord_file)
 
         except FileNotFoundError:
-            print(f"File not found: {file_path}")
+            print(f"\033[91mFile not found: {file_path}\033[0m")
         except HTTPException as e:
             if e.status == 413:
                 # TODO: Handle payload too large
