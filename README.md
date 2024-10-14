@@ -7,12 +7,15 @@ Script created in order to download replays from USB drives en masse and upload 
 
 
 ## How to use
-0. Configure your settings first. The `GRUDBot_APIKEY` and `ReplayChannelID` values are required for
-the bot to send the message to your channel. You also need to add the GRUDBot. ***Right now, you will
-have to host your OWN GRUDBot for this to work.*** For the optimal experience, please make sure you have
-the *Cascadia Code* font installed, or text may be misaligned. (TODO: Have font included in project)
+0. Configure your settings first. If you don't have a settings.json file, run `grud.bat` and it will
+generate a settings file for you. Set the `GRUDBot_APIKEY` and `ReplayChannelID` values required for
+the bot to send the message to your channel. If `GRUDBot_APIKEY` or `ReplayChannelID` is not set, the program will run in `Zip-only mode`.
 
-1. Run grud, either by launching `grud.bat` or by running `main.py` with python. Run it with the flag `-n` or `--naked` to 
+   You also need to add the GRUDBot if you want to send a Discord message with the files attached. ***Right now, you
+   will have to host your OWN GRUDBot for this to work.*** For the optimal experience, please make sure you have the
+   *Cascadia Code* font installed, or text may be misaligned. (TODO: Have font included in project)
+
+1. Run grud, either by launching `grud.bat` or by running `main.py` with Python. Run it with the flag `-n` or `--naked` to 
 use the program without any GUI. **NOTE:** As of right now, GRUD from the terminal is broken and should not be used
 
 2. Check the list of drives to see if all Slippi replay folders are detected. You will see a number
@@ -24,7 +27,7 @@ which represents the amount of replay files found within a drive.
    If you want to save copies of the replays locally, check the "**Keep copy?**" box and    choose a directory
    for the files to be stored to.
 
-   If you **don't** want to send a discord message and just store the replays locally, uncheck the "**Send message?**" box.
+   If you **don't** want to send a Discord message and just store the replays locally, uncheck the "**Send message?**" box.
    Note that you can't have both **Keep copy?** and **Send message?** unchecked, as the **Download** button would just
    empty the drives then.
 
@@ -33,7 +36,7 @@ If keeping local copies, you will find Zip archives of each setup, called `Setup
 
 ## Installing
 
-It is recommended to first create a virtual environment in python like so:
+It is recommended to first create a virtual environment in Python like so:
 
 ```bash
 python -m venv .venv
@@ -42,7 +45,7 @@ python -m venv .venv
 If you create a virtual environment, then you may want to modify `grud.bat` to activate
 your environment before trying to launch GRUD.
 
-Then, install the required dependancies using the `requirements.txt` file:
+Then, install the required dependencies using the `requirements.txt` file:
 ```bash
 pip install -r requirements.txt
 ```

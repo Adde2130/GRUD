@@ -27,7 +27,11 @@ def get_folder_size(path: str) -> int:
     return size
 
 #TODO: MULTIPROCESSED COMPRESSION OF SPLIT ARCHIVES
+#      PERHAPS COMPRESSION IN C FOR FASTER SPEED?
 def compress_folder(path: str, size_limit: int) -> int: # Returns number of archives made
+    if size_limit == 0:
+        size_limit = 0xFFFFFFFF # 4GB
+
     size = get_folder_size(path)
     archives = 1
 
@@ -44,12 +48,12 @@ def compress_folder(path: str, size_limit: int) -> int: # Returns number of arch
                     print(f"File size: {size}")
                     return 0
 
-    if archives == 1: # Create one archive. Easy.
+    if archives == 1: 
         with zipfile.ZipFile(f"{path}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
             for file in os.listdir(path):
                 zipf.write(f"{path}/{file}", arcname=file)
 
-    else: # Create multiple archives. Annoying.
+    else: 
         files = os.listdir(path)
         parts = __divide_chunks(files, math.ceil(len(files) / archives))
         for i, part in enumerate(parts):

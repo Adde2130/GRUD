@@ -20,7 +20,8 @@ from threading import Thread
 from grudbot import GRUDBot 
 
 COLORS = {"GRAY" : "#414151", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
-          "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2"}
+          "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2", "ORANGE" : "#f7c54f",
+          "PINK": "#ffb6c1"}
 
 drives = []
 drive_path = []
@@ -177,11 +178,17 @@ class GRUDApp:
                     self.bot_status.grid_forget()
                     self.bot_status.configure(text="Invalid API key!", text_color=COLORS["RED"], anchor="n")
                     self.bot_status.grid(row=2, column=2, padx=0)
+                    self.state = "zip_only_mode"
+                    self.root.after(1500, self.update_status)
+                    return
 
                 elif self.grudbot.error == "ChannelNotFound":
                     self.bot_status.grid_forget()
                     self.bot_status.configure(text="Channel not found!", text_color=COLORS["RED"], anchor="n")
                     self.bot_status.grid(row=2, column=2, padx=0)
+                    self.state = "zip_only_mode"
+                    self.root.after(1500, self.update_status)
+                    return
                 
                 elif self.grudbot.connected:
                     self.state = "ready"
@@ -193,6 +200,34 @@ class GRUDApp:
                 else:
                     text = dotdotdot(self.status_message, self.anim_counter / 13 % 3 + 1)
                     self.bot_status.configure(text=text)
+
+            case "zip_only_mode":
+
+                if self.send_message_box.get() == 1:
+                    self.send_message_box.deselect()
+
+                if self.keep_copy_box.get() == 0:
+                    self.keep_copy_box.select()
+
+                if (self.transfered_folders or  self.plugged_in_folders) and self.download_path != "":
+                    self.enable_widget(self.download_button)
+                else:
+                    self.disable_widget(self.download_button)
+
+
+                self.disable_widget(self.send_message_box)
+                self.disable_widget(self.keep_copy_box)
+                self.disable_widget(self.msg_box)
+
+                self.enable_widget(self.open_drives_button)
+                self.enable_widget(self.transfer_button)
+                self.enable_widget(self.path_button)
+
+                self.status_message = "Zip-only mode"
+
+                self.bot_status.grid_forget()
+                self.bot_status.configure(text=self.status_message, text_color=COLORS["ORANGE"])
+                self.bot_status.grid(row=2, column=2, padx=30)
 
             case "invalid_settings":
 
@@ -322,7 +357,11 @@ class GRUDApp:
             return
 
         folders_to_send = []
-        size_limit = self.grudbot.replay_channel.guild.filesize_limit # :D
+
+        if send_message:
+            size_limit = self.grudbot.replay_channel.guild.filesize_limit # :D
+        else:
+            size_limit = 0
 
         with ProcessPoolExecutor() as executor:
 
@@ -341,24 +380,31 @@ class GRUDApp:
                 result = task.result()
                 if result > 1: # We created multiple parts
                     for _ in range(0, result):
-                        folders_to_send.append(f"{download_path}/{folders_to_zip[i]} part {i + 1}.zip")
+                        filename = f"{self.temp_dir}/{folders_to_zip[i]} part {i + 1}.zip"
+                        folders_to_send.append(filename)
+                        shutil.copy(filename, download_path)
                 else:
-                    folders_to_send.append(f"{download_path}/{folders_to_zip[i]}.zip")
+                    filename = f"{self.temp_dir}/{folders_to_zip[i]}.zip"
+                    folders_to_send.append(filename)
+                    shutil.copy(filename, download_path)
 
-        self.state = "sending"
-        if self.gui:
-            self.status_message="Sending"
-            self.bot_status.configure(text=self.status_message)
-        
-        future = asyncio.run_coroutine_threadsafe(self.grudbot.send_message(message), self.grudbot.loop)
-        future.result()
 
         if send_message: 
+            self.state = "sending"
+            if self.gui:
+                self.status_message="Sending"
+                self.bot_status.configure(text=self.status_message)
+            
+            future = asyncio.run_coroutine_threadsafe(self.grudbot.send_message(message), self.grudbot.loop)
+            future.result()
+
             for folder in folders_to_send:
                 future = asyncio.run_coroutine_threadsafe(self.grudbot.send_file(folder), self.grudbot.loop)
                 future.result()
                 if delete_files:
                     os.remove(folder)
+
+        self.transfered_folders = {}
 
         print("Done!")
         self.state = "ready"
@@ -450,7 +496,8 @@ class GRUDApp:
             shutil.rmtree(self.temp_dir)
 
         self.root.destroy()
-        self.stop_grudbot();
+        if self.grudbot.connected:
+            self.stop_grudbot();
 
 
     # :)
@@ -495,7 +542,8 @@ class GRUDApp:
     def transfer_replays_action(self): # :/
         asyncio.run(self.transfer_replays(self.temp_dir))
 
-    def enable_widget(self, widget):
+    # TODO: Just store the correct function within the button itself to avoid this mess...
+    def enable_widget(self, widget): 
         if widget.cget("state") != tk.NORMAL:
             if widget is self.download_button:
                 widget.config(state=tk.NORMAL, bg=COLORS["BLUE"])
@@ -503,6 +551,8 @@ class GRUDApp:
                 widget.config(state=tk.NORMAL, bg=COLORS["LIGHT_GREEN"])
             elif widget is self.open_drives_button:
                 widget.config(state=tk.NORMAL, bg=COLORS["YELLOW"])
+            elif widget is self.path_button:
+                widget.config(state=tk.NORMAL, bg=COLORS["PINK"])
             elif widget is self.msg_box:
                 self.root.focus()
                 if self.msg_box.get("1.0", tk.END).strip() == self.example_message:
@@ -514,11 +564,13 @@ class GRUDApp:
             else:
                 widget.config(state=tk.NORMAL)
 
+    # TODO: same as enable_widget
     def disable_widget(self, widget):
         if widget.cget("state") != tk.DISABLED:
             if widget is self.download_button or \
                widget is self.transfer_button or \
-               widget is self.open_drives_button:
+               widget is self.open_drives_button or \
+               widget is self.path_button:
                 widget.config(state=tk.DISABLED, bg="white")
             elif widget is self.msg_box:
                 self.root.focus()
