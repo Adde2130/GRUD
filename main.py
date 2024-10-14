@@ -413,7 +413,8 @@ class GRUDApp:
         if self.gui:
             self.status_message = "Ready"
 
-    # Open a file dialog to select a folder
+
+    #TODO: Create data class for folders to clean up this mess...
     def refresh_drives(self):
         if self.gui:
             self.listbox.delete(0, tk.END)
@@ -477,13 +478,20 @@ class GRUDApp:
 
         self.plugged_in_folders = folders_plugged_in
 
+
         if self.gui:
             for wii_num in self.transfered_folders:
                 if wii_num not in wii_nums_plugged_in:
                     self.listbox.insert(tk.END,  "????????? Wii#" + wii_num + " ----- Transfered")
                     self.listbox.itemconfig(tk.END, foreground="green")
 
+            if os.name == "nt":
+                appdata = os.path.join(os.environ["APPDATA"], "GRUD")
 
+            for folder in os.listdir(appdata):
+                wii_num = folder[7:]
+                self.listbox.insert(tk.END, "Recovered Wii#" + wii_num + " ----- In AppData/GRUD")
+                self.listbox.itemconfig(tk.END, foreground="red")
 
     def open_drives(self):
         if os.name == "nt":
@@ -500,7 +508,7 @@ class GRUDApp:
             if os.name == "nt":
                 appdata = os.path.join(os.environ["APPDATA"], "GRUD")
             
-            shutil.copytree(self.temp_dir, appdata)
+            shutil.copytree(self.temp_dir, appdata, dirs_exist_ok=True)
 
         shutil.rmtree(self.temp_dir)
 
@@ -593,9 +601,11 @@ class GRUDApp:
 def printerror(text: str):
     print(f"\033[91m{text}\033[0m")
 
+
 def dotdotdot(text: str, dots: int) -> str:
     text += '.' * int(dots)
     return text
+
 
 def main():
     # Parse arguments
