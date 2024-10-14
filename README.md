@@ -16,8 +16,17 @@ the *Cascadia Code* font installed, or text may be misaligned. (TODO: Have font 
 use the program without any GUI. **NOTE:** As of right now, GRUD from the terminal is broken and should not be used
 
 2. Check the list of drives to see if all Slippi replay folders are detected. You will see a number
-which represents the amount of replay files found within a drive. If you want to save copies of the
-replays locally, check the "**Keep copy?**" box and choose a directory for the files to be stored to.
+which represents the amount of replay files found within a drive. 
+
+   If you can't fit all of the USBs into your PC at once, please press **Transfer Folders** to transfer
+   from all of the drives currently plugged in.
+
+   If you want to save copies of the replays locally, check the "**Keep copy?**" box and    choose a directory
+   for the files to be stored to.
+
+   If you **don't** want to send a discord message and just store the replays locally, uncheck the "**Send message?**" box.
+   Note that you can't have both **Keep copy?** and **Send message?** unchecked, as the **Download** button would just
+   empty the drives then.
 
 3. Click **DOWNLOAD** to transfer the replays, zip them and then send them to the channel with the `ReplayChannelID`. 
 If keeping local copies, you will find Zip archives of each setup, called `Setup #NUM`, where `NUM` is the number of the setup. 
@@ -39,3 +48,4 @@ pip install -r requirements.txt
 ```
 You should also install the fonts *Cascadia Code* and *Cascadia Code Bold* if you want the
 text to be properly aligned, as they're the fonts intended for the GUI. 
+
