@@ -6,7 +6,10 @@ from discord.errors import HTTPException, LoginFailure, NotFound
 
 class GRUDBot(Bot):
     def __init__(self, replay_channel_id: int):
-        super().__init__(command_prefix="!", intents=discord.Intents.default())
+        intents = discord.Intents.default()
+        intents.members = True
+
+        super().__init__(command_prefix="!", intents=intents)
         self.replay_channel_id = replay_channel_id
         self.connected = False
         self.error = ""
@@ -56,5 +59,19 @@ class GRUDBot(Bot):
     async def send_message(self, message: str):
         if message == "":
             return
+
+        if "@" in message:
+            for member in self.replay_channel.guild.members:
+                if f"@{member.display_name}" in message:
+                    message = message.replace(f"@{member.display_name}", member.mention)
+            
+            for role in self.replay_channel.guild.roles:
+                if f"@{role.name}" in message:
+                    message = message.replace(f"@{role.name}", role.mention)
+
+        if "@Everyone" in message.lower():
+            message = message.replace(f"@Everyone", "@everyone")
+
+
         await self.replay_channel.send(content=message)
 

@@ -382,11 +382,13 @@ class GRUDApp:
                     for _ in range(0, result):
                         filename = f"{self.temp_dir}/{folders_to_zip[i]} part {i + 1}.zip"
                         folders_to_send.append(filename)
-                        shutil.copy(filename, download_path)
+                        if not delete_files:
+                            shutil.copy(filename, download_path)
                 else:
                     filename = f"{self.temp_dir}/{folders_to_zip[i]}.zip"
                     folders_to_send.append(filename)
-                    shutil.copy(filename, download_path)
+                    if not delete_files:
+                        shutil.copy(filename, download_path)
 
 
         if send_message: 
@@ -492,8 +494,15 @@ class GRUDApp:
         if self.state == "zipping" or self.state == "sending": # TODO: Handle file cleanup instead of just refusing
             return
 
-        if self.temp_dir:
-            shutil.rmtree(self.temp_dir)
+        if len(os.listdir(self.temp_dir)) > 0:
+            # We probably transfered some files but forgot to send them
+            # TODO: Add these files to the list when the program is restarted
+            if os.name == "nt":
+                appdata = os.path.join(os.environ["APPDATA"], "GRUD")
+            
+            shutil.copytree(self.temp_dir, appdata)
+
+        shutil.rmtree(self.temp_dir)
 
         self.root.destroy()
         if self.grudbot.connected:
@@ -542,7 +551,7 @@ class GRUDApp:
     def transfer_replays_action(self): # :/
         asyncio.run(self.transfer_replays(self.temp_dir))
 
-    # TODO: Just store the correct function within the button itself to avoid this mess...
+    # TODO: Just store the correct function within the widget itself to avoid this mess...
     def enable_widget(self, widget): 
         if widget.cget("state") != tk.NORMAL:
             if widget is self.download_button:
