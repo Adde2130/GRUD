@@ -9,9 +9,7 @@ import argparse
 import json
 import asyncio
 import shutil
-import zipfile
 import compress
-import time
 import tempfile
 
 from enum import Enum
@@ -64,10 +62,11 @@ class ReplayFolder:
         else:
             self.filecount = -1
     
-
+    @property
     def can_transfer(self):
         return self.state is ReplayState.IN_DRIVE and self.filecount > 0 and self.name
 
+    @property
     def can_zip(self):
         return self.state is ReplayState.TRANSFERED and self.name
 
@@ -271,7 +270,7 @@ class GRUDApp:
                 if self.keep_copy_box.get() == 0:
                     self.keep_copy_box.select()
 
-                if self.download_path and any(folder.can_transfer() or folder.can_zip() for folder in self.replay_folders):
+                if self.download_path and any(folder.can_transfer or folder.can_zip for folder in self.replay_folders):
                     self.enable_widget(self.download_button)
                 else:
                     self.disable_widget(self.download_button)
@@ -305,7 +304,7 @@ class GRUDApp:
 
                 both_boxes_unchecked = self.keep_copy_box.get() == 0 and self.send_message_box.get() == 0
 
-                if all(not folder.can_transfer() and not folder.can_zip() for folder in self.replay_folders) \
+                if all(not folder.can_transfer and not folder.can_zip for folder in self.replay_folders) \
                         or both_boxes_unchecked:
                     self.disable_widget(self.download_button)
                 else:
@@ -562,7 +561,7 @@ class GRUDApp:
 
 
     def listbox_on_click(self, event):
-        if self.state != "ready":
+        if self.state != "ready"::
             return
 
         selection = self.listbox.curselection()
@@ -692,7 +691,7 @@ class GRUDApp:
         
         folders = {}
         for folder in self.replay_folders:
-            if folder.can_transfer():
+            if folder.can_transfer:
                 folders[folder.name] = folder.source
 
 
