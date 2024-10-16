@@ -14,8 +14,11 @@ import compress
 import time
 import tempfile
 
+from enum import Enum
 from concurrent.futures import ProcessPoolExecutor 
 from threading import Thread
+from dataclasses import dataclass
+from itertools import zip_longest
 
 from grudbot import GRUDBot 
 
@@ -23,27 +26,67 @@ COLORS = {"GRAY" : "#414151", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
           "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2", "ORANGE" : "#f7c54f",
           "PINK": "#ffb6c1"}
 
-drives = []
-drive_path = []
-drive_number = []
 
-FONT_PATH = os.path.join(os.path.dirname(__file__), "res", "CascadiaCode.ttf")
-FONT_BOLD_PATH = os.path.join(os.path.dirname(__file__), "res", "CascadiaCode-Bold.ttf")
+class ReplayState(Enum):
+    IN_DRIVE = 1
+    TRANSFERED = 2
+    RECOVERED = 3
 
+    def __lt__(self, other):
+        if not isinstance(other, ReplayState):
+            return TypeError
+        return self.value < other.value
+
+@dataclass(init=False, order=True, slots=True)
+class ReplayFolder:
+    state: ReplayState
+    source: str 
+    name: str
+    filecount: int 
+    plugged_in: bool
+
+    def __init__(self, state: ReplayState, source: str, plugged_in=False):
+        self.state = state
+        self.source = source
+        self.plugged_in = plugged_in
+
+
+        items = os.listdir(source)
+        if "GRUD.json" in items:
+            with open(os.path.join(source, "GRUD.json")) as f:
+                settings = json.load(f)
+                self.name = settings["name"]
+        else:
+            self.name = ""
+
+        if "Slippi" in items:
+            self.filecount = len(os.listdir(os.path.join(source, "Slippi")))
+        else:
+            self.filecount = -1
+    
+
+    def can_transfer(self):
+        return self.state is ReplayState.IN_DRIVE and self.filecount > 0 and self.name
+
+    def can_zip(self):
+        return self.state is ReplayState.TRANSFERED and self.name
+
+
+#TODO: Separate GUI and GRUD
+#      Make temp_dir be appdata instead
 class GRUDApp:
     def __init__(self, settings, gui=True):
-        self.drives = []
         self.drive_path = []
         self.listbox = None
         self.gui = gui 
+        self.should_refresh = True
 
         self.settings = settings
         self.download_thread = None
 
         self.temp_dir = tempfile.mkdtemp()
 
-        self.plugged_in_folders = {}
-        self.transfered_folders = {}
+        self.replay_folders = []
 
         if self.settings is None:
             self.settings = {
@@ -64,9 +107,14 @@ class GRUDApp:
 
         
         # Check for windows
-        if os.name != "nt":
+        if os.name == "nt":
+            self.appdata = os.path.join(os.environ["APPDATA"], "GRUD")
+            if not os.path.isdir(self.appdata):
+                os.mkdir(self.appdata)
+        else:
             printerror("Only Windows is supported in this version of GRUD")
             exit(1)
+
 
         if self.state == "connecting":
             self.start_grudbot()
@@ -75,11 +123,12 @@ class GRUDApp:
             self.initGUI()
 
         self.refresh_drives()
+
         
     def initGUI(self):
         self.root = customtkinter.CTk()
         self.root.title("GRUD")
-        self.root.geometry("800x400")
+        self.root.geometry("1000x500")
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.root.resizable(False, False)
         self.root.configure(bg=COLORS["GRAY"])
@@ -88,7 +137,8 @@ class GRUDApp:
         self.keep_copy_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
                                            text="Keep copy?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
         self.keep_copy_box.grid(row=4, column=2, sticky="w", padx=20)
-        self.path_button = tk.Button(self.root, text="Choose path...", command=self.select_path,
+
+        self.path_button = tk.Button(self.root, text="Choose path...", command=self.path_button_callback,
                                      font=("Cascadia Code", 16), state=tk.DISABLED, width=20, cursor="hand2")
         self.path_button.grid(row=4, column=2, sticky="w", padx=(240, 0), )
 
@@ -115,29 +165,41 @@ class GRUDApp:
         self.msg_box.bind("<FocusOut>", self.msg_focus_out)
         
         # List of drives
-        self.listbox = tk.Listbox(self.root, width=50, height=15, font=("Cascadia Code", 12))
+        self.listbox_font = font.Font(family="Cascadia Code", size=12)
+
+        self.listbox = tk.Listbox(self.root, width=50, height=15, font=self.listbox_font)
+        self.listbox.bind("<<ListboxSelect>>", self.listbox_on_click)
         self.listbox.grid(row=1,column=1, rowspan=8, columnspan=1, padx= 20, pady=20)
 
-        # Bot status
+        self.input_field = tk.StringVar()
+        self.entry = tk.Entry(self.root, textvariable=self.input_field, font=self.listbox_font)
+        self.entry.bind("<KeyRelease>", self.entry_on_keypress)
+        self.entry.bind("<KeyPress>", self.entry_on_keypress)
+        self.entry.bind("<Return>", self.entry_on_return)
+
+        # Bot status (rename this?)
         self.bot_label = customtkinter.CTkLabel(self.root, text="GRUDBot Status", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"])
         self.bot_label.grid(row=1, column=2,  padx=30, sticky="s")
         self.bot_status = customtkinter.CTkLabel(self.root, text="Connecting...", font=("Cascadia Code", 24, "bold"), text_color=COLORS["YELLOW"], anchor="w")
         self.bot_status.grid(row=2, column=2, padx=(110,0), sticky="w")
 
         # Buttons
-        self.transfer_button = tk.Button(self.root, text="Transfer Drives", command=self.transfer_replays_action,
+        self.transfer_button = tk.Button(self.root, text="Transfer Drives", command=self.transfer_replays_button_callback,
                                         padx=8, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["LIGHT_GREEN"], cursor="hand2")
         self.transfer_button.grid(row=9,column=0,sticky="W", rowspan=1, columnspan=3, padx=20)
+
         self.open_drives_button = tk.Button(self.root, text="Open Drives", command=self.open_drives,
                                             padx=16, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["YELLOW"], cursor="hand2")
         self.open_drives_button.grid(row=9,column=1,sticky="W", rowspan=1, columnspan=3, padx=295)
-        self.download_button = tk.Button(self.root, text="Download", command=self.download_action, padx=20,
+
+        self.download_button = tk.Button(self.root, text="Download", command=self.download_button_callback, padx=20,
                                          pady=10, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
         self.download_button.grid(row=9,column=2, rowspan=1, columnspan=3)
 
         # Animation
         self.anim_counter = 0
         self.update_status()
+
 
     def msg_focus_in(self, event):
         if self.msg_box.get("1.0", tk.END).strip() == self.example_message and self.msg_box.cget("state") == tk.NORMAL:
@@ -209,7 +271,7 @@ class GRUDApp:
                 if self.keep_copy_box.get() == 0:
                     self.keep_copy_box.select()
 
-                if (self.transfered_folders or  self.plugged_in_folders) and self.download_path != "":
+                if self.download_path and any(folder.can_transfer() or folder.can_zip() for folder in self.replay_folders):
                     self.enable_widget(self.download_button)
                 else:
                     self.disable_widget(self.download_button)
@@ -243,7 +305,7 @@ class GRUDApp:
 
                 both_boxes_unchecked = self.keep_copy_box.get() == 0 and self.send_message_box.get() == 0
 
-                if (not self.transfered_folders and not self.plugged_in_folders) \
+                if all(not folder.can_transfer() and not folder.can_zip() for folder in self.replay_folders) \
                         or both_boxes_unchecked:
                     self.disable_widget(self.download_button)
                 else:
@@ -284,7 +346,7 @@ class GRUDApp:
         self.root.after(30, self.update_status)
 
 
-    def download_action(self):
+    def download_button_callback(self):
         message = self.msg_box.get("1.0", tk.END).strip()
         if message == self.example_message:
             message = ""
@@ -303,14 +365,8 @@ class GRUDApp:
                 kwargs={"delete_files" : temp_files, "send_message" : send_message})
         self.download_thread.start()
 
-        # self.download_button.config(state=tk.DISABLED)
-        # self.open_drives_button.config(state=tk.DISABLED)
-        # self.transfer_button.config(state=tk.DISABLED)
-        # self.keep_copy_box.configure(state=tk.DISABLED)
-        # self.path_button.configure(state=tk.DISABLED)
-        #
 
-    def select_path(self):
+    def path_button_callback(self):
         download_path = filedialog.askdirectory(title="Select a directory to download to")
         
         if download_path:
@@ -330,7 +386,10 @@ class GRUDApp:
 
         asyncio.run(self.transfer_replays(self.temp_dir))
 
-        folders_to_zip = [folder for folder in os.listdir(self.temp_dir) if "Setup #" in folder]
+        folders_to_zip = []
+        for replay_folder in self.replay_folders:
+            if replay_folder.state is ReplayState.TRANSFERED:
+                folders_to_zip.append(replay_folder.name)
 
         self.state="zipping"
         
@@ -341,6 +400,7 @@ class GRUDApp:
 
         folders_to_remove = []
         
+        # redundant now?
         for folder in folders_to_zip:
             if ".zip" in folder:
                 printerror(f"The zip file {folder} already exists at this location. TODO: HANDLE THIS")
@@ -390,6 +450,14 @@ class GRUDApp:
                     if not delete_files:
                         shutil.copy(filename, download_path)
 
+        # Remove zipped folders from the list
+        self.replay_folders = [
+            folder
+            for folder in self.replay_folders
+            if folder.name not in folders_to_zip
+        ]
+
+        self.should_refresh = True
 
         if send_message: 
             self.state = "sending"
@@ -406,7 +474,6 @@ class GRUDApp:
                 if delete_files:
                     os.remove(folder)
 
-        self.transfered_folders = {}
 
         print("Done!")
         self.state = "ready"
@@ -414,84 +481,154 @@ class GRUDApp:
             self.status_message = "Ready"
 
 
-    #TODO: Create data class for folders to clean up this mess...
     def refresh_drives(self):
-        if self.gui:
-            self.listbox.delete(0, tk.END)
-
         if os.name == "nt":
-            self.drives = [f"{d}:\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\")]
+            drives = [f"{d}:/" for d in string.ascii_uppercase if os.path.exists(f"{d}:/")]
 
-        folderStatus = ""
 
-        wii_nums_plugged_in = [] # Yes, I am duct taping this code together instead of rewriting it.
-        folders_plugged_in = {}
+        replay_folders = [
+                folder
+                for folder in self.replay_folders
+                if folder.state is not ReplayState.IN_DRIVE
+        ]
 
-        for drive in self.drives:
-            wii_num = 0
 
-            slpFolderFound = False
-            workingDrive = False
+        # Unplugged transfered drives
+        for folder in replay_folders:
+            if folder.state is ReplayState.TRANSFERED and folder.source not in drives:
+                folder.plugged_in = False
+                self.should_refresh = True
+    
 
+        # Add folders currently in drives
+        for drive in drives:
+            folder = ReplayFolder(ReplayState.IN_DRIVE, drive, plugged_in=True)
+
+            index = -1
+            for i, replay_folder in enumerate(replay_folders):
+                if replay_folder.name == folder.name and replay_folder.state is ReplayState.TRANSFERED:
+                    index = i 
+                    break
             
-            replayPath = f"{drive}Slippi"
-            for content in os.listdir(drive):
-                if content.isdigit():
-                    wii_num = content
-                    continue
-
-                if content == "Slippi":
-                    slpFolderFound = True
-                    continue
-                    
-
-            if wii_num == 0:
-                slpMsg = "Numbered folder missing!"
-                wii_num = "?"
+            if index != -1:
+                replay_folders[index].source = folder.source
+                replay_folders[index].plugged_in = True
+                self.should_refresh = True
             else:
-                wii_nums_plugged_in.append(wii_num)
-                wii_nums_plugged_in.sort()
-                if not slpFolderFound:
-                    slpMsg = '"Slippi" replay folder missing!'
-                else:
-                    file_count = len(os.listdir(replayPath))
-                    if not file_count:
-                        slpMsg = "Replay folder empty!"
-                    else:
-                        slpMsg = f"{file_count}"
-                        workingDrive = True
+                replay_folders.append(folder)
+                
+
+        replay_folders.sort()
 
 
-            if workingDrive:
-                folders_plugged_in[wii_num] = replayPath
-                folders_plugged_in = dict(sorted(folders_plugged_in.items()))
-                dirName = replayPath
-            else:
-                dirName = f"{drive}??????"
+        if replay_folders != self.replay_folders or self.should_refresh:
+            self.replay_folders = replay_folders
+            self.should_refresh = False
 
             if self.gui:
-                if wii_num in self.transfered_folders:
-                    self.listbox.insert(tk.END, self.transfered_folders[wii_num] + " Wii#" + wii_num + " ----- Transfered" )
-                    self.listbox.itemconfig(tk.END, foreground="green")
+                self.listbox_update()           
+
+
+    def listbox_update(self):
+        self.listbox.delete(0, tk.END)
+
+        longest_name = max(len(folder.name) for folder in self.replay_folders)
+
+        for folder in self.replay_folders:
+            state = folder.state 
+            if folder.name:
+                name_str = f"{folder.name} "
+            else:
+                name_str = f"?? "
+
+            name_str += "-" * (longest_name - len(name_str) + 1) # Fill rest out with dashes
+
+            if state is ReplayState.IN_DRIVE:
+                if folder.filecount == -1:
+                    self.listbox.insert(tk.END, f"{folder.source}?????? -- {name_str}-- No 'Slippi' folder found!")
+                elif not folder.name:
+                    self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- No name found!")
                 else:
-                    self.listbox.insert(tk.END, dirName + " Wii#" + wii_num + " ----- " + slpMsg + folderStatus)
-
-        self.plugged_in_folders = folders_plugged_in
-
-
-        if self.gui:
-            for wii_num in self.transfered_folders:
-                if wii_num not in wii_nums_plugged_in:
-                    self.listbox.insert(tk.END,  "????????? Wii#" + wii_num + " ----- Transfered")
-                    self.listbox.itemconfig(tk.END, foreground="green")
-
-            if os.name == "nt":
-                appdata = os.path.join(os.environ["APPDATA"], "GRUD")
-
-            for folder in os.listdir(appdata):
-                wii_num = folder[7:]
-                self.listbox.insert(tk.END, "Recovered Wii#" + wii_num + " ----- In AppData/GRUD")
+                    self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- Files: {folder.filecount}")
+            elif state is ReplayState.TRANSFERED:
+                if folder.plugged_in:
+                    self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- Transfered")
+                else:
+                    self.listbox.insert(tk.END, f"------------ {name_str}-- Transfered")
+                self.listbox.itemconfig(tk.END, foreground="green")
+            elif state is ReplayState.RECOVERED:
+                self.listbox.insert(tk.END, f"Recovered -- {name_str}-- In AppData/GRUD")
                 self.listbox.itemconfig(tk.END, foreground="red")
+
+
+    def listbox_on_click(self, event):
+        if self.state != "ready":
+            return
+
+        selection = self.listbox.curselection()
+        
+        if not selection:
+            return
+
+        index = selection[0]
+        folder = self.replay_folders[index]
+        if folder.state is not ReplayState.IN_DRIVE:
+            self.entry.place_forget()
+            return
+
+        self.selected_item_index = index
+
+        x, y, width, height = self.listbox.bbox(index)
+
+        padx = 20
+        pady = 20
+
+        x += padx + 115
+        y += pady - 2
+
+        if folder.name:
+            self.input_field.set(folder.name)
+        else:
+            self.input_field.set("??")
+
+        current_text = self.input_field.get()
+        text_width = self.listbox_font.measure(current_text)
+
+        self.entry.place(x=x, y=y, width=max(10, text_width) + 5)
+        
+        #TODO: FIX SELECTION (THE TKINTER DOCS FUCKING SUCK)
+        self.entry.selection_range(0, tk.END)
+        self.entry.focus_set()
+
+
+    def entry_on_keypress(self, event):
+        current_text = self.input_field.get()
+
+        text_width = self.listbox_font.measure(current_text)
+
+        self.entry.place(width=max(10, text_width) + 5)
+
+        text = self.listbox.get(self.selected_item_index)
+        start_index = text.find(" ")
+        end_index = text.rfind(" -- ")
+
+        new_text = f"{text[:start_index]} -- {self.input_field.get()}{text[end_index:]}"
+        self.listbox.delete(self.selected_item_index)
+        self.listbox.insert(self.selected_item_index, new_text)
+
+
+    def entry_on_return(self, event):
+        folder = self.replay_folders[self.selected_item_index]
+        folder.name = self.input_field.get()
+
+        name = {"name" : folder.name}
+        with open(f"{folder.source}/GRUD.json", "w") as file:
+            json.dump(name, file, indent=4)
+
+        self.should_refresh = True
+        self.root.focus()
+        self.entry.place_forget()
+
 
     def open_drives(self):
         if os.name == "nt":
@@ -513,8 +650,7 @@ class GRUDApp:
         shutil.rmtree(self.temp_dir)
 
         self.root.destroy()
-        if self.grudbot.connected:
-            self.stop_grudbot();
+        self.stop_grudbot();
 
 
     # :)
@@ -529,34 +665,51 @@ class GRUDApp:
         asyncio.run_coroutine_threadsafe(self.grudbot.close(), self.grudbot.loop)
         self.bot_thread.join()
 
-    async def transfer_folder(self, wii_num, slippi_folder, dest):
-        setup_path = f"{dest}/Setup #{wii_num}"
+    async def transfer_folder(self, name, source, dest):
+        setup_path = f"{dest}/{name}"
+        slippi_folder = f"{source}/Slippi"
+
         os.makedirs(setup_path, exist_ok=True)
         for file in os.listdir(slippi_folder):
             src = f"{slippi_folder}/{file}"
             shutil.move(src, setup_path)
-        self.transfered_folders[wii_num] = slippi_folder
-        print(f"Wii {wii_num} complete")
+
+        folder = next((folder for folder in self.replay_folders if folder.name == name), None)
+        if not folder:
+            printerror("I don't have the slightest idea why this has happened, but the folder magically disappeared from the list after the transfer")
+            return
+
+        folder.state = ReplayState.TRANSFERED
+        self.should_refresh = True 
+
+        print(f"{name} transfered")
 
     async def transfer_replays(self, dest: str):
         if not os.path.exists(dest):
             printerror(f"Destination path '{dest}' does not exist")
             return
 
-        if len(self.plugged_in_folders) == 0:
+        
+        folders = {}
+        for folder in self.replay_folders:
+            if folder.can_transfer():
+                folders[folder.name] = folder.source
+
+
+        if len(folders) == 0:
             printerror("No USB drives to download from!")
             return
 
+
         tasks = [
-            self.transfer_folder(wii_num, slippi_folder, dest)
-            for wii_num, slippi_folder, in self.plugged_in_folders.items()
-            if wii_num not in self.transfered_folders
+            self.transfer_folder(name, slippi_folder, dest)
+            for name, slippi_folder, in folders.items()
         ]
 
         await asyncio.gather(*tasks)
 
 
-    def transfer_replays_action(self): # :/
+    def transfer_replays_button_callback(self):
         asyncio.run(self.transfer_replays(self.temp_dir))
 
     # TODO: Just store the correct function within the widget itself to avoid this mess...
@@ -596,6 +749,7 @@ class GRUDApp:
                 widget.configure(state=tk.DISABLED)
             else:
                 widget.config(state=tk.DISABLED)
+
 
 
 def printerror(text: str):
