@@ -35,6 +35,7 @@ class ReplayState(Enum):
             return TypeError
         return self.value < other.value
 
+
 @dataclass(init=False, order=True, slots=True)
 class ReplayFolder:
     state: ReplayState
@@ -561,7 +562,7 @@ class GRUDApp:
 
 
     def listbox_on_click(self, event):
-        if self.state != "ready"::
+        if self.state != "ready":
             return
 
         selection = self.listbox.curselection()
