@@ -42,7 +42,7 @@ representing the amount of replay files found within each drive.
 
 It is recommended to first create a virtual environment in Python like so:
 
-```bash
+```shell
 python -m venv .venv
 .venv\Scripts\activate
 ```
@@ -56,7 +56,7 @@ python "%~dp0/main.py" %*
 ```
 
 Then, install the required dependencies using the `requirements.txt` file:
-```bash
+```shell
 pip install -r requirements.txt
 ```
 
