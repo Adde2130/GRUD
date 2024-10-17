@@ -51,7 +51,15 @@ class ReplayFolder:
 
 
         items = os.listdir(source)
-        if "GRUD.json" in items:
+
+        if state is ReplayState.RECOVERED:
+            if os.name == "nt":
+                index = self.source.rfind("\\")
+            else:
+                index = self.source.rfind("/")
+            self.name = self.source[index + 1:]
+
+        elif "GRUD.json" in items:
             with open(os.path.join(source, "GRUD.json")) as f:
                 settings = json.load(f)
                 self.name = settings["name"]
@@ -115,6 +123,9 @@ class GRUDApp:
             printerror("Only Windows is supported in this version of GRUD")
             exit(1)
 
+        self.temp_dir = os.path.join(self.appdata, "TempFiles")
+        if not os.path.isdir(self.temp_dir):
+            os.mkdir(self.temp_dir)
 
         if self.state == "connecting":
             self.start_grudbot()
@@ -379,6 +390,10 @@ class GRUDApp:
 
         
     def download(self, download_path: str, message: str, delete_files=False, send_message=True):
+        if download_path == self.temp_dir:
+            printerror("You can't download directly to the temp files")
+            return
+
         self.state="transfering"
         if self.gui:
             self.status_message="Transfering"
@@ -440,15 +455,20 @@ class GRUDApp:
                 result = task.result()
                 if result > 1: # We created multiple parts
                     for _ in range(0, result):
-                        filename = f"{self.temp_dir}/{folders_to_zip[i]} part {i + 1}.zip"
+                        filename = f"{self.appdata}/TempFiles/{folders_to_zip[i]} part {i + 1}.zip"
                         folders_to_send.append(filename)
                         if not delete_files:
                             shutil.copy(filename, download_path)
                 else:
-                    filename = f"{self.temp_dir}/{folders_to_zip[i]}.zip"
+                    filename = f"{self.appdata}/TempFiles/{folders_to_zip[i]}.zip"
                     folders_to_send.append(filename)
                     if not delete_files:
                         shutil.copy(filename, download_path)
+
+
+        for folder in folders_to_zip:
+            shutil.rmtree(f"{self.appdata}/TempFiles/{folder}")
+
 
         # Remove zipped folders from the list
         self.replay_folders = [
@@ -471,8 +491,7 @@ class GRUDApp:
             for folder in folders_to_send:
                 future = asyncio.run_coroutine_threadsafe(self.grudbot.send_file(folder), self.grudbot.loop)
                 future.result()
-                if delete_files:
-                    os.remove(folder)
+                os.remove(folder)
 
 
         print("Done!")
@@ -517,6 +536,18 @@ class GRUDApp:
             else:
                 replay_folders.append(folder)
                 
+
+        # Add recovered folders
+        # TODO: Handle name collision for recovered folders and folders in drives
+        for folder in os.listdir(self.temp_dir):
+            full_path = os.path.join(self.temp_dir, folder)
+            if not os.path.isdir(full_path):
+                continue
+
+            folder_object = ReplayFolder(ReplayState.RECOVERED, full_path, plugged_in=False)
+            if not any(replay_folder.name == folder_object.name for replay_folder in replay_folders):
+                replay_folders.append(folder_object)
+
 
         replay_folders.sort()
 
@@ -639,15 +670,6 @@ class GRUDApp:
         if self.state == "zipping" or self.state == "sending": # TODO: Handle file cleanup instead of just refusing
             return
 
-        if len(os.listdir(self.temp_dir)) > 0:
-            # We probably transfered some files but forgot to send them
-            # TODO: Add these files to the list when the program is restarted
-            if os.name == "nt":
-                appdata = os.path.join(os.environ["APPDATA"], "GRUD")
-            
-            shutil.copytree(self.temp_dir, appdata, dirs_exist_ok=True)
-
-        shutil.rmtree(self.temp_dir)
 
         self.root.destroy()
         self.stop_grudbot();
