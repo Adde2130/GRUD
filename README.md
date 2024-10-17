@@ -51,7 +51,8 @@ your environment before launching GRUD. Add the following:
 
 ```batch
 @echo off
-call .venv\Scripts\activate # <-- new line to add
+REM Add the line below
+call .venv\Scripts\activate 
 python "%~dp0/main.py" %*
 ```
 
