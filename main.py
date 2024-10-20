@@ -9,7 +9,6 @@ import argparse
 import json
 import asyncio
 import shutil
-import compress
 import tempfile
 
 from enum import Enum
@@ -17,7 +16,11 @@ from concurrent.futures import ProcessPoolExecutor
 from threading import Thread
 from dataclasses import dataclass
 from itertools import zip_longest
+from pathvalidate import sanitize_filename
 
+# This repo 
+import compress
+import slp_parser
 from grudbot import GRUDBot 
 
 COLORS = {"GRAY" : "#414151", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
@@ -81,7 +84,7 @@ class ReplayFolder:
 
 
 #TODO: Separate GUI and GRUD
-#      Make temp_dir be appdata instead
+#      Abandon the listbox and use other widgets instead
 class GRUDApp:
     def __init__(self, settings, gui=True):
         self.drive_path = []
@@ -90,9 +93,7 @@ class GRUDApp:
         self.should_refresh = True
 
         self.settings = settings
-        self.download_thread = None
-
-        self.temp_dir = tempfile.mkdtemp()
+        self.editing_drive_name = False
 
         self.replay_folders = []
 
@@ -178,21 +179,22 @@ class GRUDApp:
         # List of drives
         self.listbox_font = font.Font(family="Cascadia Code", size=12)
 
-        self.listbox = tk.Listbox(self.root, width=50, height=15, font=self.listbox_font)
+        # For some fucking reason you can scroll this listbox by holding the mouse and draging 
+        # left or right, despite xscrollcommand explicitly being None. The docs doesn't mention
+        # this at all, I have no idea why it would even happen.
+        self.listbox = tk.Listbox(self.root, width=50, height=15, selectmode=tk.SINGLE, font=self.listbox_font, activestyle="none", highlightthickness=0, xscrollcommnad=None) 
         self.listbox.bind("<<ListboxSelect>>", self.listbox_on_click)
         self.listbox.grid(row=1,column=1, rowspan=8, columnspan=1, padx= 20, pady=20)
 
         self.input_field = tk.StringVar()
         self.entry = tk.Entry(self.root, textvariable=self.input_field, font=self.listbox_font)
-        self.entry.bind("<KeyRelease>", self.entry_on_keypress)
-        self.entry.bind("<KeyPress>", self.entry_on_keypress)
         self.entry.bind("<Return>", self.entry_on_return)
 
         # Bot status (rename this?)
         self.bot_label = customtkinter.CTkLabel(self.root, text="GRUDBot Status", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"])
         self.bot_label.grid(row=1, column=2,  padx=30, sticky="s")
         self.bot_status = customtkinter.CTkLabel(self.root, text="Connecting...", font=("Cascadia Code", 24, "bold"), text_color=COLORS["YELLOW"], anchor="w")
-        self.bot_status.grid(row=2, column=2, padx=(110,0), sticky="w")
+        self.bot_status.grid(row=2, column=2, padx=(155,0), sticky="w")
 
         # Buttons
         self.transfer_button = tk.Button(self.root, text="Transfer Drives", command=self.transfer_replays_button_callback,
@@ -232,8 +234,6 @@ class GRUDApp:
         match self.state:
             case "connecting":
 
-                self.status_message = "Connecting"
-
                 self.disable_widget(self.download_button)
 
                 if self.keep_copy_box.get() == 1:
@@ -265,13 +265,12 @@ class GRUDApp:
                 
                 elif self.grudbot.connected:
                     self.state = "ready"
-                    self.status_message = "Ready"
                     
                     self.bot_status.grid_forget()
-                    self.bot_status.configure(text=self.status_message, text_color=COLORS["LIGHT_GREEN"], anchor="n")
+                    self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"], anchor="n")
                     self.bot_status.grid(row=2, column=2, padx=0)
                 else:
-                    text = dotdotdot(self.status_message, self.anim_counter / 13 % 3 + 1)
+                    text = dotdotdot("Connecting", self.anim_counter / 13 % 3 + 1)
                     self.bot_status.configure(text=text)
 
             case "zip_only_mode":
@@ -287,7 +286,6 @@ class GRUDApp:
                 else:
                     self.disable_widget(self.download_button)
 
-
                 self.disable_widget(self.send_message_box)
                 self.disable_widget(self.keep_copy_box)
                 self.disable_widget(self.msg_box)
@@ -296,18 +294,16 @@ class GRUDApp:
                 self.enable_widget(self.transfer_button)
                 self.enable_widget(self.path_button)
 
-                self.status_message = "Zip-only mode"
-
                 self.bot_status.grid_forget()
-                self.bot_status.configure(text=self.status_message, text_color=COLORS["ORANGE"])
+                self.bot_status.configure(text="Zip-only mode", text_color=COLORS["ORANGE"])
                 self.bot_status.grid(row=2, column=2, padx=30)
 
             case "invalid_settings":
 
                 self.disable_widget(self.download_button)
-                self.status_message = "Invalid settings.json!\nCheck your syntax"
+                message = "Invalid settings.json!\nCheck your syntax"
                 self.bot_status.grid_forget()
-                self.bot_status.configure(text=self.status_message, text_color=COLORS["RED"])
+                self.bot_status.configure(textmessage, text_color=COLORS["RED"])
                 self.bot_status.grid(row=2, column=2, padx=30)
 
             case "ready":
@@ -348,12 +344,17 @@ class GRUDApp:
                 self.disable_widget(self.msg_box)
                 self.disable_widget(self.send_message_box)
 
-                text = dotdotdot(self.status_message, self.anim_counter / 13 % 3 + 1)
+                text = dotdotdot(self.state.capitalize(), self.anim_counter / 13 % 3 + 1)
                 self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
             case _:
                 printerror(f"Unknown state {self.state}")
 
         self.refresh_drives()
+        
+        if self.editing_drive_name:
+            self.listbox_update()
+            self.entry_update()
+
         self.root.after(30, self.update_status)
 
 
@@ -363,18 +364,16 @@ class GRUDApp:
             message = ""
 
         download_path = self.download_path
-        temp_files = False
         if not download_path or self.keep_copy_box.get() == 0:
             download_path = self.temp_dir
-            temp_files = True
 
         send_message = self.send_message_box.get() == 1
 
-        self.download_thread = Thread(
+        download_thread = Thread(
                 target=self.download,
                 args=(download_path, message),
-                kwargs={"delete_files" : temp_files, "send_message" : send_message})
-        self.download_thread.start()
+                kwargs={"send_message" : send_message})
+        download_thread.start()
 
 
     def path_button_callback(self):
@@ -389,28 +388,20 @@ class GRUDApp:
             self.path_button.configure(text=path_text)
 
         
-    def download(self, download_path: str, message: str, delete_files=False, send_message=True):
-        if download_path == self.temp_dir:
-            printerror("You can't download directly to the temp files")
-            return
+    def download(self, download_path: str, message: str, send_message=True):
+        delete_files = download_path == self.temp_dir
 
         self.state="transfering"
-        if self.gui:
-            self.status_message="Transfering"
-            self.bot_status.configure(text=self.status_message)
 
         asyncio.run(self.transfer_replays(self.temp_dir))
 
         folders_to_zip = []
         for replay_folder in self.replay_folders:
             if replay_folder.state is ReplayState.TRANSFERED:
-                folders_to_zip.append(replay_folder.name)
+                folders_to_zip.append(f"{self.temp_dir}/{replay_folder.name}")
 
         self.state="zipping"
         
-        if self.gui:
-            self.status_message="Zipping"
-            self.bot_status.configure(text=self.status_message)
         print("Zipping...")
 
         folders_to_remove = []
@@ -431,6 +422,11 @@ class GRUDApp:
             printerror("No folders to zip. Exiting function")
             return
 
+        # Rename SLP files
+        for folder in folders_to_zip:
+            slp_parser.adjust_names(folder)
+
+
         folders_to_send = []
 
         if send_message:
@@ -443,7 +439,7 @@ class GRUDApp:
             tasks = [
                 executor.submit(
                     compress.compress_folder,
-                    f"{self.temp_dir}/{folder}", 
+                    folder, 
                     size_limit
                     )
                 for folder in folders_to_zip
@@ -455,35 +451,28 @@ class GRUDApp:
                 result = task.result()
                 if result > 1: # We created multiple parts
                     for _ in range(0, result):
-                        filename = f"{self.appdata}/TempFiles/{folders_to_zip[i]} part {i + 1}.zip"
+                        filename = f"{folders_to_zip[i]} part {i + 1}.zip"
                         folders_to_send.append(filename)
                         if not delete_files:
                             shutil.copy(filename, download_path)
                 else:
-                    filename = f"{self.appdata}/TempFiles/{folders_to_zip[i]}.zip"
+                    filename = f"{folders_to_zip[i]}.zip"
                     folders_to_send.append(filename)
                     if not delete_files:
                         shutil.copy(filename, download_path)
-
-
-        for folder in folders_to_zip:
-            shutil.rmtree(f"{self.appdata}/TempFiles/{folder}")
 
 
         # Remove zipped folders from the list
         self.replay_folders = [
             folder
             for folder in self.replay_folders
-            if folder.name not in folders_to_zip
+            if f"{self.temp_dir}/{folder.name}" not in folders_to_zip
         ]
 
         self.should_refresh = True
 
         if send_message: 
             self.state = "sending"
-            if self.gui:
-                self.status_message="Sending"
-                self.bot_status.configure(text=self.status_message)
             
             future = asyncio.run_coroutine_threadsafe(self.grudbot.send_message(message), self.grudbot.loop)
             future.result()
@@ -496,10 +485,8 @@ class GRUDApp:
 
         print("Done!")
         self.state = "ready"
-        if self.gui:
-            self.status_message = "Ready"
 
-
+        
     def refresh_drives(self):
         if os.name == "nt":
             drives = [f"{d}:/" for d in string.ascii_uppercase if os.path.exists(f"{d}:/")]
@@ -555,7 +542,6 @@ class GRUDApp:
         if replay_folders != self.replay_folders or self.should_refresh:
             self.replay_folders = replay_folders
             self.should_refresh = False
-
             if self.gui:
                 self.listbox_update()           
 
@@ -564,6 +550,7 @@ class GRUDApp:
         self.listbox.delete(0, tk.END)
 
         longest_name = max(len(folder.name) for folder in self.replay_folders)
+        longest_name = max(len(self.input_field.get()), longest_name)
 
         for folder in self.replay_folders:
             state = folder.state 
@@ -571,6 +558,7 @@ class GRUDApp:
                 name_str = f"{folder.name} "
             else:
                 name_str = f"?? "
+
 
             name_str += "-" * (longest_name - len(name_str) + 1) # Fill rest out with dashes
 
@@ -593,13 +581,14 @@ class GRUDApp:
 
 
     def listbox_on_click(self, event):
-        if self.state != "ready":
+        if self.state not in ("ready", "connecting"):
             return
 
         selection = self.listbox.curselection()
         
         if not selection:
             return
+
 
         index = selection[0]
         folder = self.replay_folders[index]
@@ -625,40 +614,66 @@ class GRUDApp:
         current_text = self.input_field.get()
         text_width = self.listbox_font.measure(current_text)
 
+        self.editing_drive_name = True
         self.entry.place(x=x, y=y, width=max(10, text_width) + 5)
+        
+        mouse_x = self.root.winfo_pointerx() - self.root.winfo_rootx()
+        mouse_y = self.root.winfo_pointery() - self.root.winfo_rooty()
+
+        if not x < mouse_x < x + text_width + 5:
+            self.entry.place_forget()
+            self.editing_drive_name = False
+            self.listbox.select_clear(0, tk.END)
+            self.root.after(5, lambda: self.root.focus_set())
+            return
         
         #TODO: FIX SELECTION (THE TKINTER DOCS FUCKING SUCK)
         self.entry.selection_range(0, tk.END)
-        self.entry.focus_set()
+        self.root.after(5, lambda: self.entry.focus_set()) # Focus is handles async, so we chill 
 
+    def entry_update(self):
+        if self.root.focus_get() is not self.entry:
+            if self.root.focus_get() is self.listbox:
+                return
+            else:
+                self.entry.place_forget()
+                self.editing_drive_name = False
+                return
 
-    def entry_on_keypress(self, event):
         current_text = self.input_field.get()
 
         text_width = self.listbox_font.measure(current_text)
 
         self.entry.place(width=max(10, text_width) + 5)
 
+        longest_name = max(len(folder.name) for folder in self.replay_folders)
+        longest_name = max(len(self.input_field.get()), longest_name)
+
+        folder_name = self.input_field.get()
+        folder_name += " " + "-" * (longest_name - len(folder_name) + 2) # Fill rest out with dashes
+
         text = self.listbox.get(self.selected_item_index)
         start_index = text.find(" ")
-        end_index = text.rfind(" -- ")
+        end_index = text.rfind("- ")
 
-        new_text = f"{text[:start_index]} -- {self.input_field.get()}{text[end_index:]}"
+        new_text = f"{text[:start_index]} -- {folder_name}{text[end_index + 1:]}"
         self.listbox.delete(self.selected_item_index)
         self.listbox.insert(self.selected_item_index, new_text)
 
 
     def entry_on_return(self, event):
+        filename = sanitize_filename(self.input_field.get())
         folder = self.replay_folders[self.selected_item_index]
-        folder.name = self.input_field.get()
+        folder.name = filename
 
         name = {"name" : folder.name}
         with open(f"{folder.source}/GRUD.json", "w") as file:
             json.dump(name, file, indent=4)
 
+        self.entry.place_forget()
+        self.editing_drive_name = False
         self.should_refresh = True
         self.root.focus()
-        self.entry.place_forget()
 
 
     def open_drives(self):
@@ -690,6 +705,9 @@ class GRUDApp:
     async def transfer_folder(self, name, source, dest):
         setup_path = f"{dest}/{name}"
         slippi_folder = f"{source}/Slippi"
+
+        if os.path.exists(setup_path):
+            shutil.rmtree(setup_path)
 
         os.makedirs(setup_path, exist_ok=True)
         for file in os.listdir(slippi_folder):

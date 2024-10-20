@@ -32,7 +32,7 @@ class GRUDBot(Bot):
                     self.error = "ChannelNotFound"
                     print("\033[91mWARNING: We didn't find a channel, yet an error wasn't raised???\033[0m")
 
-        except NotFound as e:
+        except (NotFound, HTTPException) as e:
             self.error = "ChannelNotFound"
             raise e
 
