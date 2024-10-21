@@ -81,7 +81,7 @@ class ReplayFolder:
 
 
 #TODO: Separate GUI and GRUD
-#      Make temp_dir be appdata instead
+#      Add scaling factor for app upscaling 
 class GRUDApp:
     def __init__(self, settings, gui=True):
         self.drive_path = []
@@ -119,6 +119,9 @@ class GRUDApp:
             self.appdata = os.path.join(os.environ["APPDATA"], "GRUD")
             if not os.path.isdir(self.appdata):
                 os.mkdir(self.appdata)
+
+            from ctypes import windll # Fix for laptops
+            windll.shcore.SetProcessDpiAwareness(1)
         else:
             printerror("Only Windows is supported in this version of GRUD")
             exit(1)
