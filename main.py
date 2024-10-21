@@ -86,9 +86,21 @@ class ReplayFolder:
 #TODO: Separate GUI and GRUD
 #      Add scaling factor for app upscaling 
 class GRUDApp:
+    __slots__ = (
+            # INTERNAL
+            "gui", "should_refresh", "settings",
+            "settings", "editing_drive_name", "replay_folders",
+            "state", "download_path", "appdata", "temp_dir",
+            "grudbot", "bot_thread",
+
+            # GUI 
+            "root", "keep_copy_box", "path_button", "listbox", "entry",
+            "example_message", "msg_box", "send_message_box", "listbox_font",
+            "input_field", "entry", "bot_label", "bot_status", 
+            "transfer_button", "open_drives_button", "download_button", "anim_counter"
+    )
+
     def __init__(self, settings, gui=True):
-        self.drive_path = []
-        self.listbox = None
         self.gui = gui 
         self.should_refresh = True
 
