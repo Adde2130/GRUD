@@ -96,7 +96,7 @@ class GRUDApp:
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
             "example_message", "msg_box", "send_message_box", "listbox_font",
-            "input_field", "entry", "bot_label", "bot_status", 
+            "input_field", "entry", "bot_label", "bot_status", "selected_item_index",
             "transfer_button", "open_drives_button", "download_button", "anim_counter"
     )
 
