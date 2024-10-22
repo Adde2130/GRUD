@@ -21,7 +21,6 @@ EVENT_PAYLOADS_OFFSET = 0xF
 
 
 # OFFSETS FOR THE GAME INFO BLOCK
-
 STATE_OFFSET = 0xE
 
 CHARACTER_OFFSET = 0x60
@@ -53,7 +52,7 @@ def parse_file(filename: str) -> tuple[str, str, str]:
     stage = ""
 
     with open(filename, "rb") as file:
-        file.seek(EVENT_PAYLOADS_OFFSET + 1, 0) # Don't include payload byte 0x35
+        file.seek(EVENT_PAYLOADS_OFFSET + 1, 0) # Skip payload byte 0x35
         event_payload_size = int.from_bytes(file.read(1), "big")
 
         game_start_length = 0
@@ -81,6 +80,7 @@ def parse_file(filename: str) -> tuple[str, str, str]:
 
     return (stage, *characters)
 
+
 def adjust_names(folder: str):
     charset = string.ascii_letters + string.digits
     seed = "".join(random.choices(charset, k=4)) # Avoid name collision
@@ -94,6 +94,8 @@ def adjust_names(folder: str):
     files.sort(key=os.path.getctime, reverse=True)
 
     for i, file in enumerate(files): 
-        melee_data = parse_file(file)
-        os.rename(file, f"{folder}/{seed}_{i} - {melee_data[1]} VS. {melee_data[2]}, {melee_data[0]}.slp")
+        stage, *characters = parse_file(file)
+        os.rename(file, f"{folder}/{seed}_{i} - {characters[0]} VS. {characters[1]}, {stage}.slp")
 
+
+adjust_names("test_files")

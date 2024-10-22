@@ -580,8 +580,10 @@ class GRUDApp:
             if state is ReplayState.IN_DRIVE:
                 if folder.filecount == -1:
                     self.listbox.insert(tk.END, f"{folder.source}?????? -- {name_str}-- No 'Slippi' folder found!")
+                    self.listbox.itemconfig(tk.END, foreground="red")
                 elif not folder.name:
                     self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- No name found!")
+                    self.listbox.itemconfig(tk.END, foreground="red")
                 else:
                     self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- Files: {folder.filecount}")
             elif state is ReplayState.TRANSFERED:
@@ -640,6 +642,7 @@ class GRUDApp:
             self.editing_drive_name = False
             self.listbox.select_clear(0, tk.END)
             self.root.after(5, lambda: self.root.focus_set())
+            self.listbox_update()
             return
         
         #TODO: FIX SELECTION (THE TKINTER DOCS FUCKING SUCK)
