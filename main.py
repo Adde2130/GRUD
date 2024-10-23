@@ -97,7 +97,8 @@ class GRUDApp:
             "root", "keep_copy_box", "path_button", "listbox", "entry",
             "example_message", "msg_box", "send_message_box", "listbox_font",
             "input_field", "entry", "bot_label", "bot_status", "selected_item_index",
-            "transfer_button", "open_drives_button", "download_button", "anim_counter"
+            "transfer_button", "open_drives_button", "download_button", "anim_counter",
+            "scale_x", "scale_y"
     )
 
     def __init__(self, settings, gui=True):
@@ -159,6 +160,12 @@ class GRUDApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.root.resizable(False, False)
         self.root.configure(bg=COLORS["GRAY"])
+
+        # Get upscaling from high-DPI monitors
+        scale = self.root.tk.call("tk", "scaling")
+
+        self.scale_x = scale
+        self.scale_y = scale
 
         # Choose path
         self.keep_copy_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
@@ -634,8 +641,7 @@ class GRUDApp:
         self.editing_drive_name = True
         self.entry.place(x=x, y=y, width=max(10, text_width) + 5)
         
-        mouse_x = self.root.winfo_pointerx() - self.root.winfo_rootx()
-        mouse_y = self.root.winfo_pointery() - self.root.winfo_rooty()
+        mouse_x = self.root.winfo_pointerx() - self.root.winfo_rootx() 
 
         if not x < mouse_x < x + text_width + 5:
             self.entry.place_forget()
@@ -645,9 +651,8 @@ class GRUDApp:
             self.listbox_update()
             return
         
-        #TODO: FIX SELECTION (THE TKINTER DOCS FUCKING SUCK)
         self.entry.selection_range(0, tk.END)
-        self.root.after(5, lambda: self.entry.focus_set()) # Focus is handles async, so we chill 
+        self.root.after(5, lambda: self.entry.focus_set()) # Focus is handled async, so we chill 
 
     def entry_update(self):
         if self.root.focus_get() is not self.entry:
@@ -807,7 +812,6 @@ class GRUDApp:
                 widget.configure(state=tk.DISABLED)
             else:
                 widget.config(state=tk.DISABLED)
-
 
 
 def printerror(text: str):
