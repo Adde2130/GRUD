@@ -9,4 +9,5 @@ settings.json
 
 # Test files
 test*
+temp*
 *.slp

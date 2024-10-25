@@ -98,4 +98,3 @@ def adjust_names(folder: str):
         os.rename(file, f"{folder}/{seed}_{i} - {characters[0]} VS. {characters[1]}, {stage}.slp")
 
 
-adjust_names("test_files")

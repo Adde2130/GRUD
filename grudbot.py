@@ -3,6 +3,7 @@ import os
 
 from discord.ext.commands import Bot
 from discord.errors import HTTPException, LoginFailure, NotFound
+from aiohttp.client_exceptions import ClientConnectorDNSError
 
 class GRUDBot(Bot):
     def __init__(self, replay_channel_id: int):
@@ -22,6 +23,10 @@ class GRUDBot(Bot):
         except LoginFailure as e:
             self.error = "LoginFailure"
             raise e # We still WANT the thread to crash
+        except ClientConnectorDNSError as e:
+            print(type(e))
+            self.error = "NoInternet"
+            raise e
 
     async def on_ready(self):
         try:

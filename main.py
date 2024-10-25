@@ -17,11 +17,13 @@ from threading import Thread
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathvalidate import sanitize_filename
+from ctypes import windll
 
 # This repo 
 import compress
 import slp_parser
 from grudbot import GRUDBot 
+
 
 COLORS = {"GRAY" : "#414151", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
           "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2", "ORANGE" : "#f7c54f",
@@ -134,8 +136,7 @@ class GRUDApp:
             if not os.path.isdir(self.appdata):
                 os.mkdir(self.appdata)
 
-            from ctypes import windll # Fix for laptops
-            windll.shcore.SetProcessDpiAwareness(1)
+            windll.shcore.SetProcessDpiAwareness(1) # Laptop/upscaling fix
         else:
             printerror("Only Windows is supported in this version of GRUD")
             exit(1)
@@ -160,6 +161,12 @@ class GRUDApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.root.resizable(False, False)
         self.root.configure(bg=COLORS["GRAY"])
+
+        if os.name == "nt":
+            myappid = "Game.Replay.Uploader.for.Discord"
+            windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        
+            self.root.iconbitmap(fr"res/grudbot.ico")
 
         # Get upscaling from high-DPI monitors
         scale = self.root.tk.call("tk", "scaling")
@@ -284,6 +291,14 @@ class GRUDApp:
                     self.state = "zip_only_mode"
                     self.root.after(1500, self.update_status)
                     return
+
+                elif self.grudbot.error == "NoInternet":
+                    self.bot_status.grid_forget()
+                    self.bot_status.configure(text="No internet!", text_color=COLORS["RED"], anchor="n")
+                    self.bot_status.grid(row=2, column=2, padx=0)
+                    self.state = "zip_only_mode"
+                    self.root.after(1500, self.update_status)
+                    return
                 
                 elif self.grudbot.connected:
                     self.state = "ready"
@@ -329,7 +344,6 @@ class GRUDApp:
                 self.bot_status.grid(row=2, column=2, padx=30)
 
             case "ready":
-
                 self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"])
 
                 both_boxes_unchecked = self.keep_copy_box.get() == 0 and self.send_message_box.get() == 0
