@@ -72,7 +72,11 @@ class ReplayFolder:
             self.name = ""
 
         if "Slippi" in items:
-            self.filecount = len(os.listdir(os.path.join(source, "Slippi")))
+            self.filecount = len([
+                file
+                for file in os.listdir(os.path.join(source, "Slippi"))
+                if file.endswith(".slp")
+            ])
         else:
             self.filecount = -1
     
@@ -458,6 +462,7 @@ class GRUDApp:
             printerror("No folders to zip. Exiting function")
             return
 
+
         # Rename SLP files
         for folder in folders_to_zip:
             slp_parser.adjust_names(folder)
@@ -747,7 +752,15 @@ class GRUDApp:
             shutil.rmtree(setup_path)
 
         os.makedirs(setup_path, exist_ok=True)
-        for file in os.listdir(slippi_folder):
+
+
+        slp_files = [
+            file
+            for file in os.listdir(slippi_folder)
+            if file.endswith(".slp")
+        ]
+        
+        for file in slp_files:
             src = f"{slippi_folder}/{file}"
             shutil.move(src, setup_path)
 
