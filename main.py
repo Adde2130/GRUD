@@ -37,7 +37,7 @@ class ReplayState(Enum):
 
     def __lt__(self, other):
         if not isinstance(other, ReplayState):
-            return TypeError
+            raise TypeError(f"Comparison between ReplayState and '{type(other).__name__}' not supported")
         return self.value < other.value
 
 
