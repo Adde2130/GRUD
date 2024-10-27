@@ -73,8 +73,7 @@ class ReplayFolder:
 
         if "Slippi" in items:
             self.filecount = len([
-                file
-                for file in os.listdir(os.path.join(source, "Slippi"))
+                file for file in os.listdir(os.path.join(source, "Slippi"))
                 if file.endswith(".slp")
             ])
         else:
@@ -91,6 +90,8 @@ class ReplayFolder:
 
 #TODO: Separate GUI and GRUD
 #      Add scaling factor for app upscaling 
+#      Window resizing (MASSIVE TASK)
+#      AI Messages????
 class GRUDApp:
     __slots__ = (
             # INTERNAL
@@ -107,7 +108,7 @@ class GRUDApp:
             "scale_x", "scale_y"
     )
 
-    def __init__(self, settings, gui=True):
+    def __init__(self, settings, dev_state="", gui=True):
         self.gui = gui 
         self.should_refresh = True
 
@@ -149,8 +150,13 @@ class GRUDApp:
         if not os.path.isdir(self.temp_dir):
             os.mkdir(self.temp_dir)
 
+        if dev_state:
+            self.state = dev_state
+
         if self.state == "connecting":
             self.start_grudbot()
+        else:
+            self.grudbot = None
 
         if gui:
             self.initGUI()
@@ -199,7 +205,7 @@ class GRUDApp:
         self.example_message = "Discord message here..."
 
         self.send_message_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
-                                           text="Send message?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
+                                           text="Send discord message?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
         self.send_message_box.grid(row=5, column=2, sticky="w", padx=20)
         self.send_message_box.select()
 
@@ -344,8 +350,12 @@ class GRUDApp:
                 self.disable_widget(self.download_button)
                 message = "Invalid settings.json!\nCheck your syntax"
                 self.bot_status.grid_forget()
-                self.bot_status.configure(textmessage, text_color=COLORS["RED"])
+                self.bot_status.configure(text=message, text_color=COLORS["RED"])
                 self.bot_status.grid(row=2, column=2, padx=30)
+
+                self.state = "zip_only_mode"
+                self.root.after(2500, self.update_status)
+                return
 
             case "ready":
                 self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"])
@@ -729,7 +739,8 @@ class GRUDApp:
 
 
         self.root.destroy()
-        self.stop_grudbot();
+        if self.grudbot:
+            self.stop_grudbot();
 
 
     # :)
@@ -854,9 +865,29 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--naked", action="store_true", help="Run without any GUI")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-zo", action="store_true", help="run the program in Zip-only mode")
+    group.add_argument("-i", action="store_true", help="run the program with invalid settings")
+    group.add_argument("-t", action="store_true", help="run the program in the transfering state")
+    group.add_argument("-z", action="store_true", help="run the program in the zipping state")
+    group.add_argument("-s", action="store_true", help="run the program in the sending state")
+
     args = parser.parse_args()
 
-    
+    dev_state = ""
+    if args.zo:
+        dev_state = "zip_only_mode"
+    elif args.i:
+        dev_state = "invalid_settings"
+    elif args.t:
+        dev_state = "transfering"
+    elif args.z:
+        dev_state = "zipping"
+    elif args.s:
+        dev_state = "sending"
+
+
     # Parse settings
     if os.path.isfile("settings.json"):
         with open("settings.json", "r") as file:
@@ -867,8 +898,9 @@ def main():
                 printerror(e)
 
         app = GRUDApp(
-                gui=not args.naked, 
-                settings=settings
+                settings,
+                dev_state=dev_state,
+                gui=not args.naked
             )
     else:
         printerror("Could not find settings.json")
