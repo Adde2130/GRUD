@@ -250,7 +250,7 @@ class GRUDApp:
                                             padx=16, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["YELLOW"], cursor="hand2")
         self.open_drives_button.grid(row=9,column=1,sticky="W", rowspan=1, columnspan=3, padx=295)
 
-        self.download_button = tk.Button(self.root, text="Download", command=self.download_button_callback, padx=20,
+        self.download_button = tk.Button(self.root, text="Zip and Send", command=self.download_button_callback, padx=20,
                                          pady=10, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
         self.download_button.grid(row=9,column=2, rowspan=1, columnspan=3)
 
