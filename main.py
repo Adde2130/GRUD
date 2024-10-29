@@ -9,7 +9,7 @@ import argparse
 import json
 import asyncio
 import shutil
-import tempfile
+import psutil
 
 from enum import Enum
 from concurrent.futures import ProcessPoolExecutor 
@@ -17,7 +17,10 @@ from threading import Thread
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathvalidate import sanitize_filename
-from ctypes import windll
+
+if os.name == "nt":
+    from ctypes import windll
+    import win32api
 
 # This repo 
 import compress
@@ -48,11 +51,13 @@ class ReplayFolder:
     name: str
     filecount: int 
     plugged_in: bool
+    uuid: int
 
-    def __init__(self, state: ReplayState, source: str, plugged_in=False):
+    def __init__(self, state: ReplayState, source: str, uuid: int, plugged_in=False):
         self.state = state
         self.source = source
         self.plugged_in = plugged_in
+        self.uuid = uuid 
 
 
         items = os.listdir(source)
@@ -89,6 +94,7 @@ class ReplayFolder:
 
 
 #TODO: Separate GUI and GRUD
+#      Migrate to pyusb OR psutil for drives
 #      Add scaling factor for app upscaling 
 #      Window resizing (MASSIVE TASK)
 #      AI Messages????
@@ -537,10 +543,11 @@ class GRUDApp:
         print("Done!")
         self.state = "ready"
 
-        
+            
     def refresh_drives(self):
         if os.name == "nt":
             drives = [f"{d}:/" for d in string.ascii_uppercase if os.path.exists(f"{d}:/")]
+            get_uuid = lambda drive: win32api.GetVolumeInformation(drive)[1]
 
 
         replay_folders = [
@@ -559,11 +566,12 @@ class GRUDApp:
 
         # Add folders currently in drives
         for drive in drives:
-            folder = ReplayFolder(ReplayState.IN_DRIVE, drive, plugged_in=True)
+            uuid = get_uuid(drive)
+            folder = ReplayFolder(ReplayState.IN_DRIVE, drive, uuid, plugged_in=True)
 
             index = -1
             for i, replay_folder in enumerate(replay_folders):
-                if replay_folder.name == folder.name and replay_folder.state is ReplayState.TRANSFERED:
+                if replay_folder.uuid == folder.uuid and replay_folder.state is ReplayState.TRANSFERED:
                     index = i 
                     break
             
@@ -582,7 +590,7 @@ class GRUDApp:
             if not os.path.isdir(full_path):
                 continue
 
-            folder_object = ReplayFolder(ReplayState.RECOVERED, full_path, plugged_in=False)
+            folder_object = ReplayFolder(ReplayState.RECOVERED, full_path, 0, plugged_in=False)
             if not any(replay_folder.name == folder_object.name for replay_folder in replay_folders):
                 replay_folders.append(folder_object)
 
@@ -924,7 +932,5 @@ def main():
         os.makedirs(dest, exist_ok=True)
         app.download(dest, "TEST")
 
-
 if __name__ == "__main__":
     main()
-
