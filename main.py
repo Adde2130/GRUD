@@ -12,7 +12,7 @@ import shutil
 import psutil
 
 from enum import Enum
-from concurrent.futures import ProcessPoolExecutor 
+from concurrent.futures import ProcessPoolExecutor
 from threading import Thread
 from dataclasses import dataclass
 from itertools import zip_longest
@@ -90,7 +90,7 @@ class ReplayFolder:
 
     @property
     def can_zip(self):
-        return self.state is ReplayState.TRANSFERED and self.name
+        return self.state in (ReplayState.TRANSFERED, ReplayState.RECOVERED) and self.name
 
 
 #TODO: Separate GUI and GRUD
@@ -453,7 +453,7 @@ class GRUDApp:
 
         folders_to_zip = []
         for replay_folder in self.replay_folders:
-            if replay_folder.state is ReplayState.TRANSFERED:
+            if replay_folder.state in (ReplayState.TRANSFERED, ReplayState.RECOVERED):
                 folders_to_zip.append(f"{self.temp_dir}/{replay_folder.name}")
 
         self.state="zipping"
@@ -763,6 +763,7 @@ class GRUDApp:
         asyncio.run_coroutine_threadsafe(self.grudbot.close(), self.grudbot.loop)
         self.bot_thread.join()
 
+
     async def transfer_folder(self, name, source, dest):
         setup_path = f"{dest}/{name}"
         slippi_folder = f"{source}/Slippi"
@@ -778,10 +779,17 @@ class GRUDApp:
             for file in os.listdir(slippi_folder)
             if file.endswith(".slp")
         ]
+
         
-        for file in slp_files:
-            src = f"{slippi_folder}/{file}"
-            shutil.move(src, setup_path)
+        # shutil.move is always blocking due to the OS API calls being blocking,
+        # so we need to do this to avoid asynchio being blocking
+        loop = asyncio.get_running_loop()
+        move_tasks = [
+            loop.run_in_executor(None, shutil.move, f"{slippi_folder}/{file}", f"{setup_path}/{file}")
+            for file in slp_files
+        ]
+
+        await asyncio.gather(*move_tasks)
 
         folder = next((folder for folder in self.replay_folders if folder.name == name), None)
         if not folder:
@@ -799,7 +807,7 @@ class GRUDApp:
             return
 
         
-        folders = {}
+        folders = {} # why dict???
         for folder in self.replay_folders:
             if folder.can_transfer:
                 folders[folder.name] = folder.source
