@@ -1,2 +1,2 @@
 @echo off
-python "%~dp0/main.py" %*
+pythonw "%~dp0/main.py" %*

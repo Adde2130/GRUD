@@ -1,5 +1,7 @@
 import discord
 import os
+import argparse
+import json
 
 from discord.ext.commands import Bot
 from discord.errors import HTTPException, LoginFailure, NotFound
@@ -17,7 +19,9 @@ class GRUDBot(Bot):
 
 
     # Poor man's multithreading exception handling
-    def run(self, apikey: str):
+    def run(self, apikey: str, message=""):
+        self.message = message
+
         try:
             super().run(apikey)
         except LoginFailure as e:
@@ -36,14 +40,18 @@ class GRUDBot(Bot):
                 if self.replay_channel is None:
                     self.error = "ChannelNotFound"
                     print("\033[91mWARNING: We didn't find a channel, yet an error wasn't raised???\033[0m")
+                    return
 
         except (NotFound, HTTPException) as e:
             self.error = "ChannelNotFound"
             raise e
 
-        if self.error == "": 
-            self.connected = True
-            print("GRUDBot logged in")
+        self.connected = True
+        print("GRUDBot logged in")
+
+        if self.message:
+            await self.send_message(self.message)
+            await self.close()
 
 
     async def send_file(self, file_path: str):
@@ -80,3 +88,20 @@ class GRUDBot(Bot):
 
         await self.replay_channel.send(content=message)
 
+
+
+if __name__ == "__main__":
+    if not os.path.exists("settings.json"):
+        print("\033[91msettings.json not found\033[0m")
+        exit(-1)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("message", type=str)
+
+    args = parser.parse_args()
+
+    with open("settings.json", "r") as f:
+        settings = json.load(f)
+    
+    grud = GRUDBot(settings["ReplayChannelID"])
+    grud.run(settings["GRUDBot_APIKEY"], message=args.message)
