@@ -196,7 +196,7 @@ class GRUDApp:
 
         # Choose path
         self.keep_copy_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
-                                           text="Keep copy?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
+                                           text="Keep copies?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
         self.keep_copy_box.grid(row=4, column=2, sticky="w", padx=20)
 
         self.path_button = tk.Button(self.root, text="Choose path...", command=self.path_button_callback,
@@ -246,11 +246,11 @@ class GRUDApp:
         self.bot_status.grid(row=2, column=2, padx=(155,0), sticky="w")
 
         # Buttons
-        self.transfer_button = tk.Button(self.root, text="Transfer Drives", command=self.transfer_replays_button_callback,
+        self.transfer_button = tk.Button(self.root, text="Store locally", command=self.transfer_replays_button_callback,
                                         padx=8, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["LIGHT_GREEN"], cursor="hand2")
         self.transfer_button.grid(row=9,column=0,sticky="W", rowspan=1, columnspan=3, padx=20)
 
-        self.open_drives_button = tk.Button(self.root, text="Open Drives", command=self.open_drives,
+        self.open_drives_button = tk.Button(self.root, text="Open drives", command=self.open_drives,
                                             padx=16, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["YELLOW"], cursor="hand2")
         self.open_drives_button.grid(row=9,column=1,sticky="W", rowspan=1, columnspan=3, padx=295)
 
