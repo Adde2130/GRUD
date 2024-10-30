@@ -60,8 +60,6 @@ class ReplayFolder:
         self.uuid = uuid 
 
 
-        items = os.listdir(source)
-
         if state is ReplayState.RECOVERED:
             if os.name == "nt":
                 index = self.source.rfind("\\")
@@ -69,16 +67,22 @@ class ReplayFolder:
                 index = self.source.rfind("/")
             self.name = self.source[index + 1:]
 
-        elif "GRUD.json" in items:
-            with open(os.path.join(source, "GRUD.json")) as f:
+        elif os.path.exists(os.path.join(self.source, "GRUD.json")):
+            with open(os.path.join(self.source, "GRUD.json")) as f:
                 settings = json.load(f)
                 self.name = settings["name"]
         else:
             self.name = ""
 
-        if "Slippi" in items:
+
+        file_path = self.source
+        if self.state is not ReplayState.RECOVERED:
+            file_path = os.path.join(file_path, "Slippi")
+
+
+        if os.path.exists(file_path):
             self.filecount = len([
-                file for file in os.listdir(os.path.join(source, "Slippi"))
+                file for file in os.listdir(file_path)
                 if file.endswith(".slp")
             ])
         else:
@@ -250,8 +254,8 @@ class GRUDApp:
                                             padx=16, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["YELLOW"], cursor="hand2")
         self.open_drives_button.grid(row=9,column=1,sticky="W", rowspan=1, columnspan=3, padx=295)
 
-        self.download_button = tk.Button(self.root, text="Zip and Send", command=self.download_button_callback, padx=20,
-                                         pady=10, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
+        self.download_button = tk.Button(self.root, text="Zip and send", command=self.download_button_callback, 
+                                         width=12, padx=20, pady=10, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
         self.download_button.grid(row=9,column=2, rowspan=1, columnspan=3)
 
         # Animation
@@ -347,6 +351,8 @@ class GRUDApp:
                 self.enable_widget(self.transfer_button)
                 self.enable_widget(self.path_button)
 
+                self.download_button.config(text="Zip")
+
                 self.bot_status.grid_forget()
                 self.bot_status.configure(text="Zip-only mode", text_color=COLORS["ORANGE"])
                 self.bot_status.grid(row=2, column=2, padx=30)
@@ -387,8 +393,10 @@ class GRUDApp:
 
                 if self.send_message_box.get() == 1:
                     self.enable_widget(self.msg_box)
+                    self.download_button.config(text="Zip and send")
                 else:
                     self.disable_widget(self.msg_box)
+                    self.download_button.config(text="Zip")
 
             case "transfering" | "zipping" | "sending":
 
@@ -590,8 +598,13 @@ class GRUDApp:
             if not os.path.isdir(full_path):
                 continue
 
+            
             folder_object = ReplayFolder(ReplayState.RECOVERED, full_path, 0, plugged_in=False)
-            if not any(replay_folder.name == folder_object.name for replay_folder in replay_folders):
+            if not any(
+                    replay_folder.name == folder_object.name
+                    for replay_folder in replay_folders
+                    if replay_folder.state is not ReplayState.IN_DRIVE
+                ):
                 replay_folders.append(folder_object)
 
 
@@ -637,7 +650,7 @@ class GRUDApp:
                     self.listbox.insert(tk.END, f"------------ {name_str}-- Transfered")
                 self.listbox.itemconfig(tk.END, foreground="green")
             elif state is ReplayState.RECOVERED:
-                self.listbox.insert(tk.END, f"Recovered -- {name_str}-- In AppData/GRUD")
+                self.listbox.insert(tk.END, f"Recovered -- {name_str}-- In AppData ({folder.filecount} files)")
                 self.listbox.itemconfig(tk.END, foreground="red")
 
 
@@ -769,7 +782,18 @@ class GRUDApp:
         slippi_folder = f"{source}/Slippi"
 
         if os.path.exists(setup_path):
-            shutil.rmtree(setup_path)
+
+            found_folder = False 
+            for folder in self.replay_folders:
+                if folder.state is ReplayState.RECOVERED and folder.name == name:
+                    self.replay_folders.remove(folder)
+                    found_folder = True
+                    break
+
+            if not found_folder:
+                printerror("We got folder source destination collision, yet it wasn't from a recovered folder.")
+                printerror(f"IF YOU SEE THIS, SEND THIS TO ADDE!!!\nSource: {source}\nDestination: {setup_path}\nName: {name}")
+                return
 
         os.makedirs(setup_path, exist_ok=True)
 
@@ -807,10 +831,10 @@ class GRUDApp:
             return
 
         
-        folders = {} # why dict???
-        for folder in self.replay_folders:
-            if folder.can_transfer:
-                folders[folder.name] = folder.source
+        folders = [
+            folder for folder in self.replay_folders
+            if folder.can_transfer
+        ]
 
 
         if len(folders) == 0:
@@ -819,8 +843,8 @@ class GRUDApp:
 
 
         tasks = [
-            self.transfer_folder(name, slippi_folder, dest)
-            for name, slippi_folder, in folders.items()
+            self.transfer_folder(folder.name, folder.source, dest)
+            for folder in folders
         ]
 
         await asyncio.gather(*tasks)
