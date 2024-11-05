@@ -5,6 +5,7 @@
 __pycache__/
 *.pyc
 
+# GRUD specific
 settings.json
 
 # Test files
