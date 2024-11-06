@@ -48,13 +48,18 @@ def compress_folder(path: str, size_limit: int) -> int: # Returns number of arch
                     print(f"File size: {size}")
                     return 0
 
+    files = [
+        file for file in os.listdir(path)
+        if file.endswith(".slp")
+    ]
+
+
     if archives == 1: 
         with zipfile.ZipFile(f"{path}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
-            for file in os.listdir(path):
+            for file in files:
                 zipf.write(f"{path}/{file}", arcname=file)
 
     else: 
-        files = os.listdir(path)
         parts = __divide_chunks(files, math.ceil(len(files) / archives))
         for i, part in enumerate(parts):
             with zipfile.ZipFile(f"{path} part {i + 1}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA

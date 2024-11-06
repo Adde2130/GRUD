@@ -90,14 +90,15 @@ class ReplayFolder:
     
     @property
     def can_transfer(self):
-        return self.state is ReplayState.IN_DRIVE and self.filecount > 0 and self.name
+        return self.state in (ReplayState.IN_DRIVE, ReplayState.RECOVERED) and self.filecount > 0 and self.name
 
     @property
     def can_zip(self):
-        return self.state in (ReplayState.TRANSFERED, ReplayState.RECOVERED) and self.name
+        return self.state is ReplayState.TRANSFERED and self.name
 
 
 #TODO: Separate GUI and GRUD
+#      Progress bar for zipping so that hixon stops crashing out
 #      Migrate to pyusb OR psutil for drives
 #      Add scaling factor for app upscaling 
 #      Window resizing (MASSIVE TASK)
@@ -108,7 +109,7 @@ class GRUDApp:
             "gui", "should_refresh", "settings",
             "settings", "editing_drive_name", "replay_folders",
             "state", "download_path", "appdata", "temp_dir",
-            "grudbot", "bot_thread",
+            "grudbot", "bot_thread", "recovered",
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
@@ -156,9 +157,17 @@ class GRUDApp:
             printerror("Only Windows is supported in this version of GRUD")
             exit(1)
 
-        self.temp_dir = os.path.join(self.appdata, "TempFiles")
+        self.temp_dir = os.path.join(self.appdata, ".temp")
         if not os.path.isdir(self.temp_dir):
             os.mkdir(self.temp_dir)
+            if os.name == "nt":
+                print("HERE")
+                windll.kernel32.SetFileAttributesW(self.temp_dir, 0x2) # 0x2 == FILE_ATTRIBUTE_HIDDEN
+
+        self.recovered = os.path.join(self.appdata, "recovered")
+        if not os.path.isdir(self.recovered):
+            os.mkdir(self.recovered)
+
 
         if dev_state:
             self.state = dev_state
@@ -499,6 +508,11 @@ class GRUDApp:
         else:
             size_limit = 0
 
+        files_to_zip = []
+        for folder in folders_to_zip:
+            files_to_zip += [file for file in os.listdir(folder) if file.endswith(".slp")]
+
+
         with ProcessPoolExecutor() as executor:
 
             tasks = [
@@ -515,8 +529,10 @@ class GRUDApp:
                 # Wait for tasks to complete...
                 result = task.result()
                 if result > 1: # We created multiple parts
-                    for _ in range(0, result):
-                        filename = f"{folders_to_zip[i]} part {i + 1}.zip"
+                    for part in range(0, result):
+                        print(i)
+                        filename = f"{folders_to_zip[i]} part {part + 1}.zip"
+                        print(filename)
                         folders_to_send.append(filename)
                         if not delete_files:
                             shutil.copy(filename, download_path)
@@ -533,6 +549,8 @@ class GRUDApp:
             for folder in self.replay_folders
             if f"{self.temp_dir}/{folder.name}" not in folders_to_zip
         ]
+
+        print(folders_to_send)
 
         self.should_refresh = True
 
@@ -593,8 +611,8 @@ class GRUDApp:
 
         # Add recovered folders
         # TODO: Handle name collision for recovered folders and folders in drives
-        for folder in os.listdir(self.temp_dir):
-            full_path = os.path.join(self.temp_dir, folder)
+        for folder in os.listdir(self.recovered):
+            full_path = os.path.join(self.recovered, folder)
             if not os.path.isdir(full_path):
                 continue
 
@@ -755,8 +773,12 @@ class GRUDApp:
 
 
     def on_window_close(self):
-        if self.state == "zipping" or self.state == "sending": # TODO: Handle file cleanup instead of just refusing
-            return
+        for file in os.listdir(self.temp_dir):
+            src = os.path.join(self.temp_dir, file)
+            dst = os.path.join(self.recovered, file)
+
+            # TODO: For some reason, this nests the folder if it already exists. Handle that.
+            shutil.move(src, dst)
 
 
         self.root.destroy()
@@ -777,26 +799,20 @@ class GRUDApp:
         self.bot_thread.join()
 
 
-    async def transfer_folder(self, name, source, dest):
-        setup_path = f"{dest}/{name}"
-        slippi_folder = f"{source}/Slippi"
+    async def transfer_folder(self, replay_folder, dest):
+        setup_path = f"{dest}/{replay_folder.name}"
 
-        if os.path.exists(setup_path):
+        if replay_folder.state is ReplayState.RECOVERED:
+            slippi_folder = replay_folder.source
+        else:
+            slippi_folder = f"{replay_folder.source}/Slippi" 
 
-            found_folder = False 
-            for folder in self.replay_folders:
-                if folder.state is ReplayState.RECOVERED and folder.name == name:
-                    self.replay_folders.remove(folder)
-                    found_folder = True
-                    break
-
-            if not found_folder:
-                printerror("We got folder source destination collision, yet it wasn't from a recovered folder.")
-                printerror(f"IF YOU SEE THIS, SEND THIS TO ADDE!!!\nSource: {source}\nDestination: {setup_path}\nName: {name}")
-                return
+        if os.path.exists(setup_path) and replay_folder.state is not ReplayState.RECOVERED:
+            printerror("We got folder source destination collision, yet it wasn't from a recovered folder.")
+            printerror(f"IF YOU SEE THIS, SEND THIS TO ADDE!!!\nSource: {replay_folder.source}\nDestination: {setup_path}\nName: {replay_folder.name}")
+            return
 
         os.makedirs(setup_path, exist_ok=True)
-
 
         slp_files = [
             file
@@ -815,15 +831,22 @@ class GRUDApp:
 
         await asyncio.gather(*move_tasks)
 
-        folder = next((folder for folder in self.replay_folders if folder.name == name), None)
+        folder = next((folder for folder in self.replay_folders if folder.name == replay_folder.name), None)
         if not folder:
             printerror("I don't have the slightest idea why this has happened, but the folder magically disappeared from the list after the transfer")
             return
 
+
+        if replay_folder.state is ReplayState.RECOVERED:
+            shutil.rmtree(replay_folder.source)
+            self.replay_folders.remove(replay_folder)
+
+
         folder.state = ReplayState.TRANSFERED
         self.should_refresh = True 
 
-        print(f"{name} transfered")
+
+        print(f"{replay_folder.name} transfered")
 
     async def transfer_replays(self, dest: str):
         if not os.path.exists(dest):
@@ -843,7 +866,7 @@ class GRUDApp:
 
 
         tasks = [
-            self.transfer_folder(folder.name, folder.source, dest)
+            self.transfer_folder(folder, dest)
             for folder in folders
         ]
 
