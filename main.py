@@ -20,6 +20,7 @@ from pathvalidate import sanitize_filename
 
 if os.name == "nt":
     from ctypes import windll
+    from win32com import client
     import win32api
 
 # This repo 
@@ -935,6 +936,7 @@ def main():
     group.add_argument("-t", action="store_true", help="run the program in the transfering state")
     group.add_argument("-z", action="store_true", help="run the program in the zipping state")
     group.add_argument("-s", action="store_true", help="run the program in the sending state")
+    group.add_argument("-ws", action="store_true", help="create a windows shortcut to GRUD")
 
     args = parser.parse_args()
 
@@ -949,6 +951,16 @@ def main():
         dev_state = "zipping"
     elif args.s:
         dev_state = "sending"
+
+    # Create shortcut (Windows only)
+    if args.ws and os.name == "nt":
+        shell = client.Dispatch("WScript.Shell")
+        dir = os.path.dirname(os.path.realpath(__file__))
+        shortcut = shell.CreateShortcut(f"{dir}/GRUD.lnk")
+        shortcut.TargetPath = f"{dir}\\grud.vbs"
+        shortcut.IconLocation = f"{dir}\\res\\grudbot.ico"
+        shortcut.save()
+        exit(1)
 
 
     # Parse settings
