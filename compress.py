@@ -26,9 +26,10 @@ def get_folder_size(path: str) -> int:
 
     return size
 
-#TODO: MULTIPROCESSED COMPRESSION OF SPLIT ARCHIVES
+#TODO: Make thread safe/stoppable from other threads
+#      MULTIPROCESSED COMPRESSION OF SPLIT ARCHIVES
 #      PERHAPS COMPRESSION IN C FOR FASTER SPEED?
-def compress_folder(path: str, size_limit: int) -> int: # Returns number of archives made
+def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: # Returns number of archives made
     if size_limit == 0:
         size_limit = 0xFFFFFFFF # 4GB
 
@@ -58,6 +59,8 @@ def compress_folder(path: str, size_limit: int) -> int: # Returns number of arch
         with zipfile.ZipFile(f"{path}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
             for file in files:
                 zipf.write(f"{path}/{file}", arcname=file)
+                if compressed_files is not None:
+                    compressed_files.append(file)
 
     else: 
         parts = __divide_chunks(files, math.ceil(len(files) / archives))
@@ -65,9 +68,11 @@ def compress_folder(path: str, size_limit: int) -> int: # Returns number of arch
             with zipfile.ZipFile(f"{path} part {i + 1}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
                 for file in part:
                     zipf.write(f"{path}/{file}", arcname=file)
+                    if compressed_files is not None:
+                        compressed_files.append(file)
 
-    shutil.rmtree(path)
     print(f"{path} zipped")
+    shutil.rmtree(path)
 
     return archives
 

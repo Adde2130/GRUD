@@ -13,10 +13,12 @@ import psutil
 
 from enum import Enum
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import Manager
 from threading import Thread
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathvalidate import sanitize_filename
+from tkinter import ttk
 
 if os.name == "nt":
     from ctypes import windll
@@ -51,6 +53,7 @@ class ReplayFolder:
     source: str 
     name: str
     filecount: int 
+    path: str
     plugged_in: bool
     uuid: int
 
@@ -59,7 +62,7 @@ class ReplayFolder:
         self.source = source
         self.plugged_in = plugged_in
         self.uuid = uuid 
-
+        self.path = source
 
         if state is ReplayState.RECOVERED:
             if os.name == "nt":
@@ -75,20 +78,9 @@ class ReplayFolder:
         else:
             self.name = ""
 
-
-        file_path = self.source
-        if self.state is not ReplayState.RECOVERED:
-            file_path = os.path.join(file_path, "Slippi")
-
-
-        if os.path.exists(file_path):
-            self.filecount = len([
-                file for file in os.listdir(file_path)
-                if file.endswith(".slp")
-            ])
-        else:
-            self.filecount = -1
+        self.refresh_filecount()
     
+
     @property
     def can_transfer(self):
         return self.state in (ReplayState.IN_DRIVE, ReplayState.RECOVERED) and self.filecount > 0 and self.name
@@ -98,8 +90,22 @@ class ReplayFolder:
         return self.state is ReplayState.TRANSFERED and self.name
 
 
+    def refresh_filecount(self):
+        file_path = self.path
+        if self.state is ReplayState.IN_DRIVE:
+            file_path = os.path.join(self.source, "Slippi")
+
+        if os.path.exists(file_path):
+            self.filecount = len([
+                file for file in os.listdir(file_path)
+                if file.endswith(".slp")
+            ])
+        else:
+            self.filecount = -1
+
+
+
 #TODO: Separate GUI and GRUD
-#      Progress bar for zipping so that hixon stops crashing out
 #      Migrate to pyusb OR psutil for drives
 #      Add scaling factor for app upscaling 
 #      Window resizing (MASSIVE TASK)
@@ -110,14 +116,15 @@ class GRUDApp:
             "gui", "should_refresh", "settings",
             "settings", "editing_drive_name", "replay_folders",
             "state", "download_path", "appdata", "temp_dir",
-            "grudbot", "bot_thread", "recovered",
+            "grudbot", "bot_thread", "recovered", "files_to_compress",
+            "files_compressed", 
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
             "example_message", "msg_box", "send_message_box", "listbox_font",
             "input_field", "entry", "bot_label", "bot_status", "selected_item_index",
             "transfer_button", "open_drives_button", "download_button", "anim_counter",
-            "scale_x", "scale_y"
+            "scale_x", "scale_y", "progress_bar"
     )
 
     def __init__(self, settings, dev_state="", gui=True):
@@ -128,6 +135,9 @@ class GRUDApp:
         self.editing_drive_name = False
 
         self.replay_folders = []
+        self.files_to_compress = []
+        self.files_compressed = None 
+
 
         if self.settings is None:
             self.settings = {
@@ -267,6 +277,9 @@ class GRUDApp:
         self.download_button = tk.Button(self.root, text="Zip and send", command=self.download_button_callback, 
                                          width=12, padx=20, pady=10, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
         self.download_button.grid(row=9,column=2, rowspan=1, columnspan=3)
+
+
+        self.progress_bar = ttk.Progressbar(length=200 * self.scale_x, maximum=1)
 
         # Animation
         self.anim_counter = 0
@@ -418,8 +431,16 @@ class GRUDApp:
                 self.disable_widget(self.msg_box)
                 self.disable_widget(self.send_message_box)
 
+                if self.state == "zipping":
+                    self.progress_bar.grid(row=2, column=2, pady=(65 * self.scale_y,0))
+                    if self.files_compressed is not None:
+                        self.progress_bar["value"] = len(self.files_compressed) / (len(self.files_to_compress)) # 1 for testing purposes
+                else:
+                    self.progress_bar.grid_forget()
+
                 text = dotdotdot(self.state.capitalize(), self.anim_counter / 13 % 3 + 1)
                 self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
+
             case _:
                 printerror(f"Unknown state {self.state}")
 
@@ -471,7 +492,7 @@ class GRUDApp:
 
         folders_to_zip = []
         for replay_folder in self.replay_folders:
-            if replay_folder.state in (ReplayState.TRANSFERED, ReplayState.RECOVERED):
+            if replay_folder.state is ReplayState.TRANSFERED:
                 folders_to_zip.append(f"{self.temp_dir}/{replay_folder.name}")
 
         self.state="zipping"
@@ -509,39 +530,47 @@ class GRUDApp:
         else:
             size_limit = 0
 
-        files_to_zip = []
+        self.files_to_compress = []
         for folder in folders_to_zip:
-            files_to_zip += [file for file in os.listdir(folder) if file.endswith(".slp")]
+            self.files_to_compress += [file for file in os.listdir(folder) if file.endswith(".slp")]
 
 
-        with ProcessPoolExecutor() as executor:
+        print(folders_to_zip)
 
-            tasks = [
-                executor.submit(
-                    compress.compress_folder,
-                    folder, 
-                    size_limit
+
+        with Manager() as manager:
+            self.files_compressed = manager.list()
+
+            with ProcessPoolExecutor() as executor:
+
+                tasks = [
+                    executor.submit(
+                        compress.compress_folder,
+                        folder, 
+                        size_limit,
+                        compressed_files=self.files_compressed
                     )
-                for folder in folders_to_zip
-            ]
+                    for folder in folders_to_zip
+                ]
 
 
-            for i, task in enumerate(tasks):
-                # Wait for tasks to complete...
-                result = task.result()
-                if result > 1: # We created multiple parts
-                    for part in range(0, result):
-                        print(i)
-                        filename = f"{folders_to_zip[i]} part {part + 1}.zip"
-                        print(filename)
+                for i, task in enumerate(tasks):
+                    # Wait for tasks to complete...
+                    result = task.result()
+                    if result > 1: # We created multiple parts
+                        for part in range(0, result):
+                            filename = f"{folders_to_zip[i]} part {part + 1}.zip"
+                            print(filename)
+                            folders_to_send.append(filename)
+                            if not delete_files:
+                                shutil.copy(filename, download_path)
+                    else:
+                        filename = f"{folders_to_zip[i]}.zip"
                         folders_to_send.append(filename)
                         if not delete_files:
                             shutil.copy(filename, download_path)
-                else:
-                    filename = f"{folders_to_zip[i]}.zip"
-                    folders_to_send.append(filename)
-                    if not delete_files:
-                        shutil.copy(filename, download_path)
+
+            self.files_compressed = None
 
 
         # Remove zipped folders from the list
@@ -585,11 +614,11 @@ class GRUDApp:
 
 
         # Unplugged transfered drives
-        for folder in replay_folders:
+        for i, folder in enumerate(replay_folders):
             if folder.state is ReplayState.TRANSFERED and folder.source not in drives:
                 folder.plugged_in = False
                 self.should_refresh = True
-    
+
 
         # Add folders currently in drives
         for drive in drives:
@@ -630,11 +659,11 @@ class GRUDApp:
         replay_folders.sort()
 
 
-        if replay_folders != self.replay_folders or self.should_refresh:
-            self.replay_folders = replay_folders
-            self.should_refresh = False
-            if self.gui:
-                self.listbox_update()           
+        # if replay_folders != self.replay_folders or self.should_refresh:
+        self.replay_folders = replay_folders
+        self.should_refresh = False
+        if self.gui:
+            self.listbox_update()           
 
 
     def listbox_update(self):
@@ -664,9 +693,9 @@ class GRUDApp:
                     self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- Files: {folder.filecount}")
             elif state is ReplayState.TRANSFERED:
                 if folder.plugged_in:
-                    self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- Transfered")
+                    self.listbox.insert(tk.END, f"{folder.source}Slippi -- {name_str}-- Transfered ({folder.filecount} files)")
                 else:
-                    self.listbox.insert(tk.END, f"------------ {name_str}-- Transfered")
+                    self.listbox.insert(tk.END, f"------------ {name_str}-- Transfered ({folder.filecount} files)")
                 self.listbox.itemconfig(tk.END, foreground="green")
             elif state is ReplayState.RECOVERED:
                 self.listbox.insert(tk.END, f"Recovered -- {name_str}-- In AppData ({folder.filecount} files)")
@@ -781,6 +810,7 @@ class GRUDApp:
             # TODO: For some reason, this nests the folder if it already exists. Handle that.
             shutil.move(src, dst)
 
+        os.rmdir(self.temp_dir)
 
         self.root.destroy()
         if self.grudbot:
@@ -802,6 +832,7 @@ class GRUDApp:
 
     async def transfer_folder(self, replay_folder, dest):
         setup_path = f"{dest}/{replay_folder.name}"
+        print(replay_folder)
 
         if replay_folder.state is ReplayState.RECOVERED:
             slippi_folder = replay_folder.source
@@ -824,6 +855,7 @@ class GRUDApp:
         
         # shutil.move is always blocking due to the OS API calls being blocking,
         # so we need to do this to avoid asynchio being blocking
+        # NOTE: NAME COLLISION CAUSES OVERWRITES - SHOULDN'T BE A PROBLEM EXCEPT DURING TESTS
         loop = asyncio.get_running_loop()
         move_tasks = [
             loop.run_in_executor(None, shutil.move, f"{slippi_folder}/{file}", f"{setup_path}/{file}")
@@ -844,6 +876,8 @@ class GRUDApp:
 
 
         folder.state = ReplayState.TRANSFERED
+        folder.path = setup_path
+        folder.refresh_filecount()
         self.should_refresh = True 
 
 
@@ -911,6 +945,9 @@ class GRUDApp:
                 self.root.focus()
                 widget.config(state=tk.DISABLED, fg="gray")
             elif widget is self.keep_copy_box or widget is self.send_message_box:
+                widget.configure(state=tk.DISABLED)
+            elif widget is self.progress_bar:
+                widget.grid_forget()
                 widget.configure(state=tk.DISABLED)
             else:
                 widget.config(state=tk.DISABLED)
