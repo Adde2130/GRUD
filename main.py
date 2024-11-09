@@ -106,6 +106,7 @@ class ReplayFolder:
 
 
 #TODO: Separate GUI and GRUD
+#      Fix recovery of folders that were successfully archived but not sent
 #      Migrate to pyusb OR psutil for drives
 #      Add scaling factor for app upscaling 
 #      Window resizing (MASSIVE TASK)
@@ -113,11 +114,11 @@ class ReplayFolder:
 class GRUDApp:
     __slots__ = (
             # INTERNAL
-            "gui", "should_refresh", "settings",
+            "gui", "should_refresh_gui", "settings",
             "settings", "editing_drive_name", "replay_folders",
             "state", "download_path", "appdata", "temp_dir",
             "grudbot", "bot_thread", "recovered", "files_to_compress",
-            "files_compressed", 
+            "files_compressed", "can_refresh",
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
@@ -129,7 +130,8 @@ class GRUDApp:
 
     def __init__(self, settings, dev_state="", gui=True):
         self.gui = gui 
-        self.should_refresh = True
+        self.should_refresh_gui = True
+        self.can_refresh = True
 
         self.settings = settings
         self.editing_drive_name = False
@@ -175,6 +177,7 @@ class GRUDApp:
                 print("HERE")
                 windll.kernel32.SetFileAttributesW(self.temp_dir, 0x2) # 0x2 == FILE_ATTRIBUTE_HIDDEN
 
+
         self.recovered = os.path.join(self.appdata, "recovered")
         if not os.path.isdir(self.recovered):
             os.mkdir(self.recovered)
@@ -190,6 +193,7 @@ class GRUDApp:
 
         if gui:
             self.initGUI()
+
 
         self.refresh_drives()
 
@@ -406,6 +410,7 @@ class GRUDApp:
                 self.enable_widget(self.transfer_button)
                 self.enable_widget(self.keep_copy_box)
                 self.enable_widget(self.send_message_box)
+                self.progress_bar.grid_forget()
 
                 if self.keep_copy_box.get() == 1:
                     self.enable_widget(self.path_button)
@@ -493,7 +498,7 @@ class GRUDApp:
         folders_to_zip = []
         for replay_folder in self.replay_folders:
             if replay_folder.state is ReplayState.TRANSFERED:
-                folders_to_zip.append(f"{self.temp_dir}/{replay_folder.name}")
+                folders_to_zip.append(replay_folder.path)
 
         self.state="zipping"
         
@@ -523,7 +528,7 @@ class GRUDApp:
             slp_parser.adjust_names(folder)
 
 
-        folders_to_send = []
+        archives_to_send = []
 
         if send_message:
             size_limit = self.grudbot.replay_channel.guild.filesize_limit # :D
@@ -560,13 +565,12 @@ class GRUDApp:
                     if result > 1: # We created multiple parts
                         for part in range(0, result):
                             filename = f"{folders_to_zip[i]} part {part + 1}.zip"
-                            print(filename)
-                            folders_to_send.append(filename)
+                            archives_to_send.append(filename)
                             if not delete_files:
                                 shutil.copy(filename, download_path)
                     else:
                         filename = f"{folders_to_zip[i]}.zip"
-                        folders_to_send.append(filename)
+                        archives_to_send.append(filename)
                         if not delete_files:
                             shutil.copy(filename, download_path)
 
@@ -577,23 +581,26 @@ class GRUDApp:
         self.replay_folders = [
             folder
             for folder in self.replay_folders
-            if f"{self.temp_dir}/{folder.name}" not in folders_to_zip
+            if folder.path not in folders_to_zip
         ]
 
-        print(folders_to_send)
+        print(self.replay_folders)
 
-        self.should_refresh = True
+        self.should_refresh_gui = True
 
-        if send_message: 
+        if send_message and message[0:6] != "~TEST~": 
             self.state = "sending"
             
             future = asyncio.run_coroutine_threadsafe(self.grudbot.send_message(message), self.grudbot.loop)
             future.result()
 
-            for folder in folders_to_send:
-                future = asyncio.run_coroutine_threadsafe(self.grudbot.send_file(folder), self.grudbot.loop)
+            for archive in archives_to_send:
+                future = asyncio.run_coroutine_threadsafe(self.grudbot.send_file(archive), self.grudbot.loop)
                 future.result()
-                os.remove(folder)
+
+
+        for archive in archives_to_send:
+            os.remove(archive)
 
 
         print("Done!")
@@ -601,6 +608,9 @@ class GRUDApp:
 
             
     def refresh_drives(self):
+        if not self.can_refresh:
+            return
+
         if os.name == "nt":
             drives = [f"{d}:/" for d in string.ascii_uppercase if os.path.exists(f"{d}:/")]
             get_uuid = lambda drive: win32api.GetVolumeInformation(drive)[1]
@@ -617,7 +627,7 @@ class GRUDApp:
         for i, folder in enumerate(replay_folders):
             if folder.state is ReplayState.TRANSFERED and folder.source not in drives:
                 folder.plugged_in = False
-                self.should_refresh = True
+                self.should_refresh_gui = True
 
 
         # Add folders currently in drives
@@ -634,7 +644,7 @@ class GRUDApp:
             if index != -1:
                 replay_folders[index].source = folder.source
                 replay_folders[index].plugged_in = True
-                self.should_refresh = True
+                self.should_refresh_gui = True
             else:
                 replay_folders.append(folder)
                 
@@ -659,9 +669,9 @@ class GRUDApp:
         replay_folders.sort()
 
 
-        # if replay_folders != self.replay_folders or self.should_refresh:
+        # if replay_folders != self.replay_folders or self.should_refresh_gui:
         self.replay_folders = replay_folders
-        self.should_refresh = False
+        self.should_refresh_gui = False
         if self.gui:
             self.listbox_update()           
 
@@ -793,7 +803,7 @@ class GRUDApp:
 
         self.entry.place_forget()
         self.editing_drive_name = False
-        self.should_refresh = True
+        self.should_refresh_gui = True
         self.root.focus()
 
 
@@ -871,19 +881,21 @@ class GRUDApp:
 
 
         if replay_folder.state is ReplayState.RECOVERED:
-            shutil.rmtree(replay_folder.source)
             self.replay_folders.remove(replay_folder)
+            shutil.rmtree(replay_folder.source)
 
 
         folder.state = ReplayState.TRANSFERED
         folder.path = setup_path
         folder.refresh_filecount()
-        self.should_refresh = True 
+        self.should_refresh_gui = True 
 
 
         print(f"{replay_folder.name} transfered")
 
     async def transfer_replays(self, dest: str):
+        self.can_refresh = False
+
         if not os.path.exists(dest):
             printerror(f"Destination path '{dest}' does not exist")
             return
@@ -906,6 +918,7 @@ class GRUDApp:
         ]
 
         await asyncio.gather(*tasks)
+        self.can_refresh = True
 
 
     def transfer_replays_button_callback(self):
