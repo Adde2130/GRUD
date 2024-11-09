@@ -174,7 +174,6 @@ class GRUDApp:
         if not os.path.isdir(self.temp_dir):
             os.mkdir(self.temp_dir)
             if os.name == "nt":
-                print("HERE")
                 windll.kernel32.SetFileAttributesW(self.temp_dir, 0x2) # 0x2 == FILE_ATTRIBUTE_HIDDEN
 
 
@@ -966,8 +965,8 @@ class GRUDApp:
                 widget.config(state=tk.DISABLED)
 
 
-def printerror(text: str):
-    print(f"\033[91m{text}\033[0m")
+def printerror(message: str):
+    print(f"\033[91m{message}\033[0m")
 
 
 def dotdotdot(text: str, dots: int) -> str:
