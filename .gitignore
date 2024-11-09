@@ -8,9 +8,5 @@ __pycache__/
 # GRUD specific
 settings.json
 
-# Test files
-test/test_files/
-*.slp
-
 # Links and shortcuts
 *.lnk

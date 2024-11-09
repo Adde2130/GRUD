@@ -1,4 +1,4 @@
 @echo off
 
-python ./test/test.py
+python ./util/test.py
 python main.py 
