@@ -676,7 +676,8 @@ class GRUDApp:
 
 
     def listbox_update(self):
-        self.listbox.delete(0, tk.END)
+        self.listbox.delete(0, tk.END) 
+
 
         longest_name = max(len(folder.name) for folder in self.replay_folders)
         longest_name = max(len(self.input_field.get()), longest_name)
@@ -897,6 +898,7 @@ class GRUDApp:
 
         if not os.path.exists(dest):
             printerror(f"Destination path '{dest}' does not exist")
+            self.can_refresh = True
             return
 
         
@@ -908,6 +910,7 @@ class GRUDApp:
 
         if len(folders) == 0:
             printerror("No USB drives to download from!")
+            self.can_refresh = True
             return
 
 
