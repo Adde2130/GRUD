@@ -885,7 +885,6 @@ class GRUDApp:
 
 
         if replay_folder.state is ReplayState.RECOVERED:
-            self.replay_folders.remove(replay_folder)
             shutil.rmtree(replay_folder.source)
 
 
@@ -895,7 +894,8 @@ class GRUDApp:
 
 
     async def transfer_replays(self, dest: str):
-        self.can_refresh = False
+        # NOTE: UNCOMMENT THIS IF FOLDER LISTING ISSUES APPEAR DURING/AFTER TRANSFERING
+        # self.can_refresh = False
 
         if not os.path.exists(dest):
             printerror(f"Destination path '{dest}' does not exist")
