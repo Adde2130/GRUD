@@ -57,14 +57,18 @@ class ReplayFolder:
     plugged_in: bool
     uuid: int
 
-    def __init__(self, state: ReplayState, source: str, uuid: int, plugged_in=False):
+    def __init__(self, state: ReplayState, source: str, uuid: int, path="", plugged_in=False):
         self.state = state
         self.source = source
         self.plugged_in = plugged_in
         self.uuid = uuid 
-        self.path = source
 
-        if state is ReplayState.RECOVERED:
+        if path == "":
+            self.path = source
+        else:
+            self.path = path
+
+        if not plugged_in:
             if os.name == "nt":
                 index = self.source.rfind("\\")
             else:
@@ -76,7 +80,10 @@ class ReplayFolder:
                 settings = json.load(f)
                 self.name = settings["name"]
         else:
+            if state is ReplayState.TRANSFERED:
+                print(f"WARNING: TRANSFERED FOLDER WITHOUT A NAME! SOURCE: {source}")
             self.name = ""
+
 
         self.refresh_filecount()
     
@@ -92,6 +99,7 @@ class ReplayFolder:
 
     def refresh_filecount(self):
         file_path = self.path
+        
         if self.state is ReplayState.IN_DRIVE:
             file_path = os.path.join(self.source, "Slippi")
 
@@ -494,6 +502,8 @@ class GRUDApp:
 
         asyncio.run(self.transfer_replays(self.temp_dir))
 
+        self.refresh_drives()
+
         folders_to_zip = []
         for replay_folder in self.replay_folders:
             if replay_folder.state is ReplayState.TRANSFERED:
@@ -615,54 +625,48 @@ class GRUDApp:
             get_uuid = lambda drive: win32api.GetVolumeInformation(drive)[1]
 
 
-        replay_folders = [
-                folder
-                for folder in self.replay_folders
-                if folder.state is not ReplayState.IN_DRIVE
-        ]
-
-
-        # Unplugged transfered drives
-        for i, folder in enumerate(replay_folders):
-            if folder.state is ReplayState.TRANSFERED and folder.source not in drives:
-                folder.plugged_in = False
-                self.should_refresh_gui = True
+        replay_folders = []
 
 
         # Add folders currently in drives
         for drive in drives:
             uuid = get_uuid(drive)
-            folder = ReplayFolder(ReplayState.IN_DRIVE, drive, uuid, plugged_in=True)
+            replay_folder = ReplayFolder(ReplayState.IN_DRIVE, drive, uuid, plugged_in=True)
 
-            index = -1
-            for i, replay_folder in enumerate(replay_folders):
-                if replay_folder.uuid == folder.uuid and replay_folder.state is ReplayState.TRANSFERED:
-                    index = i 
-                    break
-            
-            if index != -1:
-                replay_folders[index].source = folder.source
-                replay_folders[index].plugged_in = True
-                self.should_refresh_gui = True
-            else:
-                replay_folders.append(folder)
+            if replay_folder.name in os.listdir(self.temp_dir):
+                full_path = os.path.join(self.temp_dir, replay_folder.name)
+                replay_folder = ReplayFolder(ReplayState.TRANSFERED, drive, uuid, path=full_path, plugged_in=True)
+
+            replay_folders.append(replay_folder)
+
+        
+        # Add transfered folders not in drives
+        for folder in os.listdir(self.temp_dir):
+            full_path = os.path.join(self.temp_dir, folder)
+            if not os.path.isdir(full_path):
+                continue
+
+            if any(folder == replay_folder.name for replay_folder in replay_folders):
+                continue
+
+            replay_folder = ReplayFolder(ReplayState.TRANSFERED, full_path, 0, plugged_in=False)
+            replay_folders.append(replay_folder)
                 
 
         # Add recovered folders
-        # TODO: Handle name collision for recovered folders and folders in drives
+        # TODO: Manually choose if recovered folders should be zipped
         for folder in os.listdir(self.recovered):
             full_path = os.path.join(self.recovered, folder)
             if not os.path.isdir(full_path):
                 continue
 
-            
-            folder_object = ReplayFolder(ReplayState.RECOVERED, full_path, 0, plugged_in=False)
+            replay_folder = ReplayFolder(ReplayState.RECOVERED, full_path, 0, plugged_in=False)
             if not any(
-                    replay_folder.name == folder_object.name
-                    for replay_folder in replay_folders
-                    if replay_folder.state is not ReplayState.IN_DRIVE
+                    replay_folder.name == other_folder.name
+                    for other_folder in replay_folders
+                    if other_folder.state is not ReplayState.IN_DRIVE
                 ):
-                replay_folders.append(folder_object)
+                replay_folders.append(replay_folder)
 
 
         replay_folders.sort()
@@ -885,13 +889,10 @@ class GRUDApp:
             shutil.rmtree(replay_folder.source)
 
 
-        folder.state = ReplayState.TRANSFERED
-        folder.path = setup_path
-        folder.refresh_filecount()
         self.should_refresh_gui = True 
 
-
         print(f"{replay_folder.name} transfered")
+
 
     async def transfer_replays(self, dest: str):
         self.can_refresh = False

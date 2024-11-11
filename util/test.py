@@ -8,21 +8,22 @@ import string
 import os
 
 from ctypes import windll
+import win32file
 
 script_path = os.path.dirname(os.path.realpath(__file__))
-print(script_path)
 example_file = os.path.join(script_path, "example.slp")
 
 FILECOUNT = 55 # Adjust as needed (See TODO for automatic setting of this const)
 
 if not os.path.exists(example_file):
     print(f"\033[91mCould not find the example file!\033[0m")
+    exit(1)
 
 if os.name == "nt":
     drives = []
     bitmask = windll.kernel32.GetLogicalDrives()
     for letter in string.ascii_uppercase:
-        if bitmask & 1 and os.path.exists(os.path.join(f"{letter}:", "GRUD.json")): 
+        if bitmask & 1 and os.path.exists(os.path.join(f"{letter}:", "GRUD.json")) and os.path.exists(os.path.join(f"{letter}:", "Slippi")): 
             drives.append(f"{letter}:")
         bitmask >>= 1
 

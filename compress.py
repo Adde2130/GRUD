@@ -44,6 +44,11 @@ def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: #
         if size * LZMA_RATIO > size_limit * MARGIN:
             while size * LZMA_RATIO / archives > size_limit * MARGIN:
                 archives += 1
+
+                if size * BZIP2_RATIO / archives > size_limit * MARGIN:
+                    comp_algo = zipfile.ZIP_LZMA
+                    break
+
                 if archives > 5:
                     print("\033[91mDISASTER WHILE TRYING TO COMPRESS. TELL ADDE\033[0m")
                     print(f"File size: {size}")
