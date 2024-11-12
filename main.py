@@ -10,6 +10,8 @@ import json
 import asyncio
 import shutil
 import psutil
+import sys
+import logging
 
 from enum import Enum
 from concurrent.futures import ProcessPoolExecutor
@@ -29,6 +31,28 @@ if os.name == "nt":
 import compress
 import slp_parser
 from grudbot import GRUDBot 
+
+# Logging
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(stream=sys.stderr)
+logger.addHandler(handler)
+
+logging.basicConfig(
+        filename="logs.log", 
+        format="[%(asctime)s, %(name)s] %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+        filemode='a',
+        level=logging.DEBUG
+)
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = handle_exception
 
 
 COLORS = {"GRAY" : "#414151", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
