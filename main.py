@@ -15,7 +15,7 @@ import logging
 
 from enum import Enum
 from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import Manager
+from multiprocessing import Manager, Event
 from threading import Thread
 from dataclasses import dataclass
 from itertools import zip_longest
@@ -149,7 +149,7 @@ class GRUDApp:
             "settings", "editing_drive_name", "replay_folders",
             "state", "download_path", "appdata", "temp_dir",
             "grudbot", "bot_thread", "recovered", "files_to_compress",
-            "files_compressed", "can_refresh",
+            "files_compressed", "can_refresh", 
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
@@ -170,7 +170,6 @@ class GRUDApp:
         self.replay_folders = []
         self.files_to_compress = []
         self.files_compressed = None 
-
 
         if self.settings is None:
             self.settings = {
@@ -572,8 +571,9 @@ class GRUDApp:
             self.files_to_compress += [file for file in os.listdir(folder) if file.endswith(".slp")]
 
 
-        print(folders_to_zip)
+        print(f"Zipping: {folders_to_zip}")
 
+        self.can_refresh = False
 
         with Manager() as manager:
             self.files_compressed = manager.list()
@@ -585,7 +585,7 @@ class GRUDApp:
                         compress.compress_folder,
                         folder, 
                         size_limit,
-                        compressed_files=self.files_compressed
+                        compressed_files=self.files_compressed,
                     )
                     for folder in folders_to_zip
                 ]
@@ -608,7 +608,7 @@ class GRUDApp:
 
             self.files_compressed = None
 
-
+        self.can_refresh = True
         # Remove zipped folders from the list
         self.replay_folders = [
             folder
@@ -844,7 +844,6 @@ class GRUDApp:
             src = os.path.join(self.temp_dir, file)
             dst = os.path.join(self.recovered, file)
 
-            # TODO: For some reason, this nests the folder if it already exists. Handle that.
             shutil.move(src, dst)
 
         os.rmdir(self.temp_dir)
@@ -890,7 +889,7 @@ class GRUDApp:
         ]
 
         
-        # shutil.move is always blocking due to the OS API calls being blocking,
+        # shutil.move is always blocking due to the OS shanigans (???),
         # so we need to do this to avoid asynchio being blocking
         # NOTE: NAME COLLISION CAUSES OVERWRITES - SHOULDN'T BE A PROBLEM EXCEPT DURING TESTS
         loop = asyncio.get_running_loop()

@@ -38,10 +38,13 @@ def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: #
 
     if size * BZIP2_RATIO < size_limit * MARGIN: 
         comp_algo = zipfile.ZIP_BZIP2
+        print(f"Zipping {path} with BZIP2")
     else:
         comp_algo = zipfile.ZIP_LZMA
+        print(f"Zipping {path} with LZMA")
 
         if size * LZMA_RATIO > size_limit * MARGIN:
+            print(f"Zipping {path} in multiple parts")
             while size * LZMA_RATIO / archives > size_limit * MARGIN:
                 archives += 1
 

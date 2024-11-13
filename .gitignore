@@ -11,3 +11,7 @@ logs.log
 
 # Links and shortcuts
 *.lnk
+
+
+# Files for testing
+*.vhd
