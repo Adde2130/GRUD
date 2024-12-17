@@ -19,8 +19,9 @@ class GRUDBot(Bot):
 
 
     # Poor man's multithreading exception handling
-    def run(self, apikey: str, message=""):
+    def run(self, apikey: str, message="", file=""):
         self.message = message
+        self.file = file
 
         try:
             super().run(apikey)
@@ -49,8 +50,11 @@ class GRUDBot(Bot):
         self.connected = True
         print("GRUDBot logged in")
 
-        if self.message:
-            await self.send_message(self.message)
+        if self.message or self.file:
+            if self.message:
+                await self.send_message(self.message)
+            if self.file:
+                await self.send_file(self.file)
             await self.close()
 
 
@@ -96,12 +100,22 @@ if __name__ == "__main__":
         exit(-1)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("message", type=str)
+    parser.add_argument("message", nargs="?", type=str)
+    parser.add_argument("--file", "-f", type=str, help="Path to file to send")
 
     args = parser.parse_args()
+
+    if args.file:
+        if not os.path.exists(args.file):
+            print(f"\033[91mFile {args.file} not found\033[0m")
+            exit(-1)
+            
+    if not args.message and not args.file:
+            print(f"\033[91mNeither message nor file specified\033[0m")
+            exit(-1)
 
     with open("settings.json", "r") as f:
         settings = json.load(f)
     
     grud = GRUDBot(settings["ReplayChannelID"])
-    grud.run(settings["GRUDBot_APIKEY"], message=args.message)
+    grud.run(settings["GRUDBot_APIKEY"], file=args.file, message=args.message)
