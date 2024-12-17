@@ -79,12 +79,14 @@ class ReplayFolder:
     path: str
     plugged_in: bool
     uuid: int
+    selected: bool
 
     def __init__(self, state: ReplayState, source: str, uuid: int, path="", plugged_in=False):
         self.state = state
         self.source = source
         self.plugged_in = plugged_in
         self.uuid = uuid 
+        self.selected = False
 
         if path == "":
             self.path = source
@@ -156,7 +158,7 @@ class GRUDApp:
             "example_message", "msg_box", "send_message_box", "listbox_font",
             "input_field", "entry", "bot_label", "bot_status", "selected_item_index",
             "transfer_button", "open_drives_button", "download_button", "anim_counter",
-            "scale_x", "scale_y", "progress_bar"
+            "scale_x", "scale_y", "progress_bar", "selected_folder_boxes"
     )
 
     def __init__(self, settings, dev_state="", gui=True):
@@ -169,6 +171,7 @@ class GRUDApp:
 
         self.replay_folders = []
         self.files_to_compress = []
+        self.selected_folder_boxes = []
         self.files_compressed = None 
 
         if self.settings is None:
@@ -230,7 +233,7 @@ class GRUDApp:
     def initGUI(self):
         self.root = customtkinter.CTk()
         self.root.title("GRUD")
-        self.root.geometry("1000x500")
+        self.root.geometry("1100x520")
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.root.resizable(False, False)
         self.root.configure(bg=COLORS["GRAY"])
@@ -250,11 +253,11 @@ class GRUDApp:
         # Choose path
         self.keep_copy_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
                                            text="Keep copies?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
-        self.keep_copy_box.grid(row=4, column=2, sticky="w", padx=20)
+        self.keep_copy_box.place(x=722, y=135, anchor='w')
 
         self.path_button = tk.Button(self.root, text="Choose path...", command=self.path_button_callback,
                                      font=("Cascadia Code", 16), state=tk.DISABLED, width=20, cursor="hand2")
-        self.path_button.grid(row=4, column=2, sticky="w", padx=(240, 0), )
+        self.path_button.place(x=722, y=195, anchor='w')
 
         if self.download_path:
             if len(self.download_path) > 18:
@@ -272,19 +275,19 @@ class GRUDApp:
         self.send_message_box.grid(row=5, column=2, sticky="w", padx=20)
         self.send_message_box.select()
 
-        self.msg_box = tk.Text(self.root, width=40, height=2, font=("Cascadia Code", 16), fg="gray")
+        self.msg_box = tk.Text(self.root, width=30, height=2, font=("Cascadia Code", 16), fg="gray")
         self.msg_box.grid(row=6, column=2, sticky="S", rowspan=2)
         self.msg_box.insert("1.0", self.example_message)
         self.msg_box.bind("<FocusIn>", self.msg_focus_in)
         self.msg_box.bind("<FocusOut>", self.msg_focus_out)
         
         # List of drives
-        self.listbox_font = font.Font(family="Cascadia Code", size=12)
+        self.listbox_font = font.Font(family="Cascadia Code", size=14)
 
         # For some fucking reason you can scroll this listbox by holding the mouse and draging 
         # left or right, despite xscrollcommand explicitly being None. The docs doesn't mention
-        # this at all, I have no idea why it would even happen.
-        self.listbox = tk.Listbox(self.root, width=50, height=15, selectmode=tk.SINGLE, font=self.listbox_font, activestyle="none", highlightthickness=0, xscrollcommnad=None) 
+        # this at all, and I have no idea why it would even happen.
+        self.listbox = tk.Listbox(self.root, width=60, height=15, selectmode=tk.SINGLE, font=self.listbox_font, activestyle="none", highlightthickness=0, xscrollcommnad=None) 
         self.listbox.bind("<<ListboxSelect>>", self.listbox_on_click)
         self.listbox.grid(row=1,column=1, rowspan=8, columnspan=1, padx= 20, pady=20)
 
@@ -293,10 +296,8 @@ class GRUDApp:
         self.entry.bind("<Return>", self.entry_on_return)
 
         # Bot status (rename this?)
-        self.bot_label = customtkinter.CTkLabel(self.root, text="GRUDBot Status", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"])
-        self.bot_label.grid(row=1, column=2,  padx=30, sticky="s")
         self.bot_status = customtkinter.CTkLabel(self.root, text="Connecting...", font=("Cascadia Code", 24, "bold"), text_color=COLORS["YELLOW"], anchor="w")
-        self.bot_status.grid(row=2, column=2, padx=(155,0), sticky="w")
+        self.bot_status.grid(row=2, column=2, padx=(105,0), sticky="w")
 
         # Buttons
         self.transfer_button = tk.Button(self.root, text="Store locally", command=self.transfer_replays_button_callback,
@@ -705,6 +706,7 @@ class GRUDApp:
     def listbox_update(self):
         self.listbox.delete(0, tk.END) 
 
+        
 
         longest_name = max(len(folder.name) for folder in self.replay_folders)
         longest_name = max(len(self.input_field.get()), longest_name)
@@ -719,6 +721,7 @@ class GRUDApp:
 
             name_str += "-" * (longest_name - len(name_str) + 1) # Fill rest out with dashes
 
+            # Add the entry
             if state is ReplayState.IN_DRIVE:
                 if folder.filecount == -1:
                     self.listbox.insert(tk.END, f"{folder.source}?????? -- {name_str}-- No 'Slippi' folder found!")
@@ -737,6 +740,24 @@ class GRUDApp:
             elif state is ReplayState.RECOVERED:
                 self.listbox.insert(tk.END, f"Recovered -- {name_str}-- In AppData ({folder.filecount} files)")
                 self.listbox.itemconfig(tk.END, foreground="red")
+
+
+        if len(self.selected_folder_boxes) != self.listbox.index("end"):
+            # Remove all previous checkboxes 
+            for checkbox in self.selected_folder_boxes:
+                checkbox.destroy()
+            self.selected_folder_boxes = []
+
+            # Add the checkboxes
+            for i, folder in enumerate(self.replay_folders):
+                checkbox = customtkinter.CTkCheckBox(self.root, width=0, height=1, corner_radius=0, text="", border_width=2,
+                                                     onvalue=True, offvalue=False)
+                checkbox_func = lambda folder=folder: setattr(folder, "selected", checkbox.get())
+                checkbox.configure(command=checkbox_func)
+                checkbox.place(x=650, y=24 + 26 * i)
+                self.selected_folder_boxes.append(checkbox)
+
+                checkbox.toggle() 
 
 
     def listbox_on_click(self, event):
@@ -762,7 +783,7 @@ class GRUDApp:
         padx = 20
         pady = 20
 
-        x += padx + 115
+        x += padx + 140
         y += pady - 2
 
         if folder.name:
@@ -787,7 +808,7 @@ class GRUDApp:
             return
         
         self.entry.selection_range(0, tk.END)
-        self.root.after(5, lambda: self.entry.focus_set()) # Focus is handled async, so we chill 
+        self.root.after(5, lambda: self.entry.focus_set()) # focus is handled async, so we chill 
 
     def entry_update(self):
         if self.root.focus_get() is not self.entry:
@@ -795,7 +816,7 @@ class GRUDApp:
                 return
             else:
                 self.entry.place_forget()
-                self.editing_drive_name = False
+                self.editing_drive_name = false
                 return
 
         current_text = self.input_field.get()
@@ -821,6 +842,8 @@ class GRUDApp:
 
     def entry_on_return(self, event):
         filename = sanitize_filename(self.input_field.get())
+        if filename == "??":
+            filename = ""
         folder = self.replay_folders[self.selected_item_index]
         folder.name = filename
 
