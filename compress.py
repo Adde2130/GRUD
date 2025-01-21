@@ -83,4 +83,3 @@ def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: #
     shutil.rmtree(path)
 
     return archives
-

@@ -38,9 +38,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
         filename="logs.log", 
         format="[%(asctime)s, %(name)s] %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
+        datefmt="%d-%m-%Y",
         filemode='a',
-        level=logging.DEBUG
+        level=logging.ERROR
 )
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -149,7 +149,7 @@ class GRUDApp:
             "settings", "editing_drive_name", "replay_folders",
             "state", "download_path", "appdata", "temp_dir",
             "grudbot", "bot_thread", "recovered", "files_to_compress",
-            "files_compressed", "can_refresh", 
+            "files_compressed", "can_refresh", "error_msg",
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
@@ -181,7 +181,8 @@ class GRUDApp:
             self.state = "invalid_settings"
         else:
             self.state = "connecting"
-
+ 
+        self.error_msg = ""
 
         # Fix download path
         self.download_path = self.settings["DefaultDownloadPath"].replace("\\", "/")
@@ -475,6 +476,25 @@ class GRUDApp:
                 text = dotdotdot(self.state.capitalize(), self.anim_counter / 13 % 3 + 1)
                 self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
 
+            case "error_thrown":
+
+                self.disable_widget(self.download_button) 
+                self.disable_widget(self.transfer_button) 
+                self.disable_widget(self.open_drives_button) 
+                self.disable_widget(self.keep_copy_box) 
+                self.disable_widget(self.path_button) 
+                self.disable_widget(self.msg_box)
+                self.disable_widget(self.send_message_box)
+                self.disable_widget(self.send_message_box)
+                self.progress_bar.grid_forget()
+                self.keep_copy_box.grid_forget()
+                self.path_button.grid_forget()
+                self.send_message_box.grid_forget()
+                self.msg_box.grid_forget()
+                self.download_button.grid_forget()
+                
+                self.bot_status.configure(text=self.error_msg, text_color=COLORS["RED"])
+
             case _:
                 printerror(f"Unknown state {self.state}")
 
@@ -593,7 +613,25 @@ class GRUDApp:
 
                 for i, task in enumerate(tasks):
                     # Wait for tasks to complete...
-                    result = task.result()
+                    try:
+                        result = task.result()
+                    except Exception as e:
+                        folder = os.path.basename(folders_to_zip[i])
+                        self.error_msg = \
+                            f"Error thrown while zipping\n" \
+                            f"{folder}\n\n" \
+                            f"Please send the logs.log file\n" \
+                            f"to Adde!\n\n" \
+                            f"If possible, also send the\n" \
+                            f"replay files to Adde!\n" \
+                            f"( %AppData%/GRUD/.temp, a\n" \
+                            f"hidden folder )" 
+
+                        self.state = "error_thrown"
+                        # Since the error is caught, log it explicitly
+                        logger.error("Error while zipping", exc_info=sys.exc_info())
+                        return
+
                     if result > 1: # We created multiple parts
                         for part in range(0, result):
                             filename = f"{folders_to_zip[i]} part {part + 1}.zip"
