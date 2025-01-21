@@ -26,7 +26,7 @@ def get_folder_size(path: str) -> int:
 
     return size
 
-#TODO: Make thread safe/stoppable from other threads
+# TODO: Make thread safe/stoppable from other threads
 #      MULTIPROCESSED COMPRESSION OF SPLIT ARCHIVES
 #      PERHAPS COMPRESSION IN C FOR FASTER SPEED?
 def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: # Returns number of archives made

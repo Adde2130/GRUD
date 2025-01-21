@@ -555,20 +555,6 @@ class GRUDApp:
         
         print("Zipping...")
 
-        folders_to_remove = []
-        
-        # redundant now?
-        for folder in folders_to_zip:
-            if ".zip" in folder:
-                printerror(f"The zip file {folder} already exists at this location. TODO: HANDLE THIS")
-                folders_to_remove.append(folder)
-        
-        for folder in folders_to_remove:
-            # Remove BOTH the zip file and the folder from the list
-            folders_to_zip.remove(folder[:-4])
-            folders_to_zip.remove(folder)
-
-
         if not folders_to_zip:
             printerror("No folders to zip. Exiting function")
             return
