@@ -2,6 +2,8 @@ import zipfile
 import math
 import os
 import shutil
+import argparse
+import time
 
 '''Rough estimations for SLP file compression'''
 
@@ -29,7 +31,7 @@ def get_folder_size(path: str) -> int:
 # TODO: Make thread safe/stoppable from other threads
 #      MULTIPROCESSED COMPRESSION OF SPLIT ARCHIVES
 #      PERHAPS COMPRESSION IN C FOR FASTER SPEED?
-def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: # Returns number of archives made
+def compress_folder(path: str, size_limit: int, compressed_files=None, remove=True) -> int: # Returns number of archives made
     if size_limit == 0:
         size_limit = 0xFFFFFFFF # 4GB
 
@@ -64,7 +66,7 @@ def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: #
 
 
     if archives == 1: 
-        with zipfile.ZipFile(f"{path}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
+        with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_LZMA, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
             for file in files:
                 zipf.write(f"{path}/{file}", arcname=file)
                 if compressed_files is not None:
@@ -80,6 +82,37 @@ def compress_folder(path: str, size_limit: int, compressed_files=None) -> int: #
                         compressed_files.append(file)
 
     print(f"{path} zipped")
-    shutil.rmtree(path)
+    
+    if remove:
+        shutil.rmtree(path)
 
     return archives
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("path")
+
+    args = parser.parse_args()
+    path = args.path
+
+    if not os.path.isdir(path):
+        print("Invalid path")
+        return
+
+    
+    print("Compressing...")
+
+    start = time.time()
+    compress_folder(path, 0, remove=False)
+    end = time.time()
+
+    print(f"Size: {os.path.getsize(f"{path}.zip") / 1024 / 1024}MB")
+    print(f"Time: {end - start} seconds")
+    os.remove(f"{path}.zip")
+
+
+
+if __name__ == "__main__":
+    main()

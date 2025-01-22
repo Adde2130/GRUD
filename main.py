@@ -572,6 +572,7 @@ class GRUDApp:
         else:
             size_limit = 0
 
+
         self.files_to_compress = []
         for folder in folders_to_zip:
             self.files_to_compress += [file for file in os.listdir(folder) if file.endswith(".slp")]
@@ -656,6 +657,8 @@ class GRUDApp:
 
 
         for archive in archives_to_send:
+            if not os.path.isfile(archive):
+                continue
             os.remove(archive)
 
 

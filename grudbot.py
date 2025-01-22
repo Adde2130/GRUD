@@ -13,9 +13,9 @@ class GRUDBot(Bot):
         intents.members = True
 
         super().__init__(command_prefix="!", intents=intents)
-        self.replay_channel_id = replay_channel_id
         self.connected = False
         self.error = ""
+        self.replay_channel_id = replay_channel_id
 
 
     # Poor man's multithreading exception handling
@@ -24,7 +24,10 @@ class GRUDBot(Bot):
         self.file = file
 
         try:
-            super().run(apikey)
+            if message or file:
+                super().run(apikey)
+            else:
+                super().run(apikey, log_handler=None)
         except LoginFailure as e:
             self.error = "LoginFailure"
             raise e # We still WANT the thread to crash
@@ -77,6 +80,14 @@ class GRUDBot(Bot):
         if message == "":
             return
 
+        if message[0:2] == "rm":
+            try:
+                msgs = int(message[2:].strip())
+                await self.remove_msgs(msgs)
+                return
+            except ValueError as e:
+                pass
+
         if "@" in message:
             for member in self.replay_channel.guild.members:
                 if f"@{member.display_name}" in message:
@@ -91,6 +102,19 @@ class GRUDBot(Bot):
 
 
         await self.replay_channel.send(content=message)
+
+
+    async def remove_msgs(self, message_count: int):
+        try:
+            if self.replay_channel:
+                messages = [message async for message in self.replay_channel.history(limit=message_count)]
+                if messages:
+                    await self.replay_channel.delete_messages(messages)
+                    print(f"Successfully deleted {message_count} messages.")
+                else:
+                    print(f"No messages found to delete.")
+        except HTTPException as e:
+            print(f"Failed to delete messages: {e}")
 
 
 
