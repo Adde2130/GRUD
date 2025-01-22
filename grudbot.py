@@ -70,11 +70,7 @@ class GRUDBot(Bot):
         except FileNotFoundError:
             print(f"\033[91mFile not found: {file_path}\033[0m")
         except HTTPException as e:
-            if e.status == 413:
-                # TODO: Handle payload too large
-                print(f"\033[91mUh oh! Payload too large! Adde made a mistake somewhere. Payload: {file_path}\033[0m")
-            else:
-                raise e
+            raise e
 
     async def send_message(self, message: str):
         if message == "":

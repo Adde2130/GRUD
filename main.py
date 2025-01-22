@@ -12,6 +12,7 @@ import shutil
 import psutil
 import sys
 import logging
+import discord
 
 from enum import Enum
 from concurrent.futures import ProcessPoolExecutor
@@ -21,6 +22,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from pathvalidate import sanitize_filename
 from tkinter import ttk
+from importlib.metadata import version
 
 if os.name == "nt":
     from ctypes import windll
@@ -572,6 +574,10 @@ class GRUDApp:
         else:
             size_limit = 0
 
+        # Fix since the lib is broken right now
+        if version("discord.py") >= "2.4.0" and size_limit == 25 * 1024 * 1024:
+            size_limit = 10 * 1024 * 1024
+
 
         self.files_to_compress = []
         for folder in folders_to_zip:
@@ -645,21 +651,32 @@ class GRUDApp:
 
         self.should_refresh_gui = True
 
+
+        failed_archives = []
         if send_message and message[0:6] != "~TEST~": 
             self.state = "sending"
             
             future = asyncio.run_coroutine_threadsafe(self.grudbot.send_message(message), self.grudbot.loop)
             future.result()
 
+            
             for archive in archives_to_send:
-                future = asyncio.run_coroutine_threadsafe(self.grudbot.send_file(archive), self.grudbot.loop)
-                future.result()
+                try:
+                    future = asyncio.run_coroutine_threadsafe(self.grudbot.send_file(archive), self.grudbot.loop)
+                    future.result()
+                except Exception as e:
+                    err = f"Payload too large for {archive}!"
+                    logger.error(err)
+                    printerror(err)
+                    failed_archives.append(archive)
 
 
         for archive in archives_to_send:
             if not os.path.isfile(archive):
                 continue
-            os.remove(archive)
+
+            if archive not in failed_archives:
+                os.remove(archive)
 
 
         print("Done!")
