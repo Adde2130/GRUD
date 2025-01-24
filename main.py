@@ -1,3 +1,7 @@
+# TODO: I am considering just rewriting all of this so
+#       that I can finally move away from the decisions
+#       Hixon made that still plague this repo (lol)
+
 import tkinter as tk
 from tkinter import filedialog, font
 
@@ -56,7 +60,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 sys.excepthook = handle_exception
 
 
-COLORS = {"GRAY" : "#414151", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
+COLORS = {"GRAY" : "#282828", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
           "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2", "ORANGE" : "#f7c54f",
           "PINK": "#ffb6c1"}
 
@@ -155,7 +159,7 @@ class GRUDApp:
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
-            "example_message", "msg_box", "send_message_box", "listbox_font",
+            "example_message", "msg_box", "send_message_box", "options_pane", "listbox_pane", "text_pane", "listbox_font",
             "input_field", "entry", "bot_label", "bot_status", "selected_item_index",
             "transfer_button", "open_drives_button", "download_button", "anim_counter",
             "scale_x", "scale_y", "progress_bar"
@@ -231,12 +235,14 @@ class GRUDApp:
 
         
     def initGUI(self):
-        self.root = customtkinter.CTk()
+        self.root = customtkinter.CTk(fg_color=COLORS["GRAY"])
         self.root.title("GRUD")
-        self.root.geometry("1000x500")
+        self.root.geometry("1000x440")
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.root.resizable(False, False)
-        self.root.configure(bg=COLORS["GRAY"])
+
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=1)
 
         if os.name == "nt":
             myappid = "Game.Replay.Uploader.for.Discord"
@@ -251,13 +257,15 @@ class GRUDApp:
         self.scale_y = scale
 
         # Choose path
-        self.keep_copy_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
-                                           text="Keep copies?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
-        self.keep_copy_box.grid(row=4, column=2, sticky="w", padx=20)
+        self.options_pane = customtkinter.CTkFrame(self.root, fg_color=COLORS["GRAY"])
 
-        self.path_button = tk.Button(self.root, text="Choose path...", command=self.path_button_callback,
+        self.keep_copy_box = customtkinter.CTkCheckBox(self.options_pane, width=10, height=1, corner_radius=0,
+                                           text="Keep copies?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
+        self.keep_copy_box.grid(row=1, column=1, sticky="w", padx=0)
+
+        self.path_button = tk.Button(self.options_pane, text="Choose path...", command=self.path_button_callback,
                                      font=("Cascadia Code", 16), state=tk.DISABLED, width=20, cursor="hand2")
-        self.path_button.grid(row=4, column=2, sticky="w", padx=(240, 0), )
+        self.path_button.grid(row=1, column=2, sticky="w", padx=(0, 0), )
 
         if self.download_path:
             if len(self.download_path) > 18:
@@ -270,52 +278,62 @@ class GRUDApp:
         # Discord message box
         self.example_message = "Discord message here..."
 
-        self.send_message_box = customtkinter.CTkCheckBox(self.root, width=10, height=1, corner_radius=0,
+        self.send_message_box = customtkinter.CTkCheckBox(self.options_pane, width=10, height=1, corner_radius=0,
                                            text="Send discord message?", checkbox_width=30, font=("Cascadia Code", 16, "bold"))
-        self.send_message_box.grid(row=5, column=2, sticky="w", padx=20)
+        self.send_message_box.grid(row=2, column=1, sticky="w", padx=0, pady=20)
         self.send_message_box.select()
 
-        self.msg_box = tk.Text(self.root, width=40, height=2, font=("Cascadia Code", 16), fg="gray")
-        self.msg_box.grid(row=6, column=2, sticky="S", rowspan=2)
+        self.msg_box = tk.Text(self.options_pane, width=40, height=2, font=("Cascadia Code", 16), fg="gray")
+        self.msg_box.grid(row=3, column=1, sticky="S", columnspan=2)
         self.msg_box.insert("1.0", self.example_message)
         self.msg_box.bind("<FocusIn>", self.msg_focus_in)
         self.msg_box.bind("<FocusOut>", self.msg_focus_out)
+
+        self.options_pane.grid(row=1, column=1, pady=(78, 0), sticky="n")
         
         # List of drives
+        self.listbox_pane = customtkinter.CTkFrame(self.root, fg_color=COLORS["GRAY"])
+
         self.listbox_font = font.Font(family="Cascadia Code", size=12)
 
         # For some fucking reason you can scroll this listbox by holding the mouse and draging 
         # left or right, despite xscrollcommand explicitly being None. The docs doesn't mention
         # this at all, I have no idea why it would even happen.
-        self.listbox = tk.Listbox(self.root, width=50, height=15, selectmode=tk.SINGLE, font=self.listbox_font, activestyle="none", highlightthickness=0, xscrollcommnad=None) 
+        self.listbox = tk.Listbox(self.listbox_pane, width=50, height=15, selectmode=tk.SINGLE, font=self.listbox_font, activestyle="none", highlightthickness=0, xscrollcommnad=None) 
         self.listbox.bind("<<ListboxSelect>>", self.listbox_on_click)
-        self.listbox.grid(row=1,column=1, rowspan=8, columnspan=1, padx= 20, pady=20)
+        self.listbox.grid(row=0,column=0, columnspan=2)
 
         self.input_field = tk.StringVar()
         self.entry = tk.Entry(self.root, textvariable=self.input_field, font=self.listbox_font)
         self.entry.bind("<Return>", self.entry_on_return)
 
+        self.listbox_pane.grid(row=0, column=0, rowspan=2, padx=20, pady=(20, 0), sticky="n")
+
         # Bot status (rename this?)
-        self.bot_label = customtkinter.CTkLabel(self.root, text="GRUDBot Status", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"])
-        self.bot_label.grid(row=1, column=2,  padx=30, sticky="s")
-        self.bot_status = customtkinter.CTkLabel(self.root, text="Connecting...", font=("Cascadia Code", 24, "bold"), text_color=COLORS["YELLOW"], anchor="w")
-        self.bot_status.grid(row=2, column=2, padx=(155,0), sticky="w")
+        self.text_pane = customtkinter.CTkFrame(self.root, fg_color=COLORS["GRAY"])
+
+        self.bot_label = customtkinter.CTkLabel(self.text_pane, text="GRUDBot Status", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"], anchor="center")
+        self.bot_label.grid(row=0, column=0,  padx=0)
+        self.bot_status = customtkinter.CTkLabel(self.text_pane, text="Connecting...", font=("Cascadia Code", 24, "bold"), text_color=COLORS["YELLOW"], anchor="center")
+        self.bot_status.grid(row=1, column=0, padx=(0,0))
+
+        self.text_pane.grid(row=0, column=1, pady=(20, 0), sticky="n")
 
         # Buttons
-        self.transfer_button = tk.Button(self.root, text="Store locally", command=self.transfer_replays_button_callback,
-                                        padx=8, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["LIGHT_GREEN"], cursor="hand2")
-        self.transfer_button.grid(row=9,column=0,sticky="W", rowspan=1, columnspan=3, padx=20)
+        self.transfer_button = tk.Button(self.listbox_pane, text="Store locally", command=self.transfer_replays_button_callback,
+                                         font=("Cascadia Code", 16, "bold"), bg=COLORS["LIGHT_GREEN"], cursor="hand2")
+        self.transfer_button.grid(row=1,column=0,sticky="SW", rowspan=1, columnspan=1, pady=(20, 0))
 
-        self.open_drives_button = tk.Button(self.root, text="Open drives", command=self.open_drives,
+        self.open_drives_button = tk.Button(self.listbox_pane, text="Open drives", command=self.open_drives,
                                             padx=16, pady=0, font=("Cascadia Code", 16, "bold"), bg=COLORS["YELLOW"], cursor="hand2")
-        self.open_drives_button.grid(row=9,column=1,sticky="W", rowspan=1, columnspan=3, padx=293)
+        self.open_drives_button.grid(row=1,column=1,sticky="SE", rowspan=1, columnspan=1, pady=(20, 0))
 
-        self.download_button = tk.Button(self.root, text="Zip and send", command=self.download_button_callback, 
-                                         width=12, padx=20, pady=10, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
-        self.download_button.grid(row=9,column=2, rowspan=1, columnspan=3)
+        self.download_button = tk.Button(self.options_pane, text="Zip and send", command=self.download_button_callback, 
+                                         width=12, padx=20, font=("Cascadia Code", 16, "bold"), state=tk.DISABLED, cursor="hand2")
+        self.download_button.grid(row=4,column=1, rowspan=1, columnspan=3, pady=(20, 0))
 
 
-        self.progress_bar = ttk.Progressbar(length=200 * self.scale_x, maximum=1)
+        self.progress_bar = ttk.Progressbar(self.text_pane, length=200 * self.scale_x, maximum=1)
 
         # Animation
         self.anim_counter = 0
@@ -383,8 +401,8 @@ class GRUDApp:
                     self.state = "ready"
                     
                     self.bot_status.grid_forget()
-                    self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"], anchor="n")
-                    self.bot_status.grid(row=2, column=2, padx=0)
+                    self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"])
+                    self.bot_status.grid(row=1, column=0, padx=0)
                 else:
                     text = dotdotdot("Connecting", self.anim_counter / 13 % 3 + 1)
                     self.bot_status.configure(text=text)
@@ -414,7 +432,7 @@ class GRUDApp:
 
                 self.bot_status.grid_forget()
                 self.bot_status.configure(text="Zip-only mode", text_color=COLORS["ORANGE"])
-                self.bot_status.grid(row=2, column=2, padx=30)
+                self.bot_status.grid(row=1, column=0)
 
             case "invalid_settings":
 
@@ -422,7 +440,7 @@ class GRUDApp:
                 message = "Invalid settings.json!\nCheck your syntax"
                 self.bot_status.grid_forget()
                 self.bot_status.configure(text=message, text_color=COLORS["RED"])
-                self.bot_status.grid(row=2, column=2, padx=30)
+                self.bot_status.grid(row=1, column=0)
 
                 self.state = "zip_only_mode"
                 self.root.after(2500, self.update_status)
@@ -469,9 +487,9 @@ class GRUDApp:
                 self.disable_widget(self.send_message_box)
 
                 if self.state == "zipping":
-                    self.progress_bar.grid(row=2, column=2, pady=(65 * self.scale_y,0))
+                    self.progress_bar.grid(row=2, column=0)
                     if self.files_compressed is not None:
-                        self.progress_bar["value"] = len(self.files_compressed) / (len(self.files_to_compress)) # 1 for testing purposes
+                        self.progress_bar["value"] = len(self.files_compressed) / (len(self.files_to_compress)) 
                 else:
                     self.progress_bar.grid_forget()
 
@@ -479,21 +497,7 @@ class GRUDApp:
                 self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
 
             case "error_thrown":
-
-                self.disable_widget(self.download_button) 
-                self.disable_widget(self.transfer_button) 
-                self.disable_widget(self.open_drives_button) 
-                self.disable_widget(self.keep_copy_box) 
-                self.disable_widget(self.path_button) 
-                self.disable_widget(self.msg_box)
-                self.disable_widget(self.send_message_box)
-                self.disable_widget(self.send_message_box)
-                self.progress_bar.grid_forget()
-                self.keep_copy_box.grid_forget()
-                self.path_button.grid_forget()
-                self.send_message_box.grid_forget()
-                self.msg_box.grid_forget()
-                self.download_button.grid_forget()
+                self.options_pane.grid_forget()
                 
                 self.bot_status.configure(text=self.error_msg, text_color=COLORS["RED"])
 
@@ -1079,7 +1083,7 @@ def main():
         shortcut.TargetPath = f"{dir}\\grud.vbs"
         shortcut.IconLocation = f"{dir}\\res\\grudbot.ico"
         shortcut.save()
-        exit(1)
+        exit(0)
 
 
     # Parse settings
