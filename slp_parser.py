@@ -71,10 +71,13 @@ def parse_file(filename: str) -> tuple[str, str, str]:
         game_info_block = game_start_bytes[0x5:0x138]
 
         # HERE IS THE ISSUE
-        if game_info_block[STATE_OFFSET + 1] > len(STAGES):
-            print(f"HERE IS THE ISSUE: \nFILE  - {filename}\nSTAGE - {game_info_block[STATE_OFFSET + 1]}")
+        if game_info_block[STATE_OFFSET + 1] >= len(STAGES):
+            print(f"UNKNOWN/MODDED STAGE: \nFILE  - {filename}\nSTAGE - {game_info_block[STATE_OFFSET + 1]}")
 
-        stage = STAGES[game_info_block[STATE_OFFSET + 1]]
+        if game_info_block[STATE_OFFSET + 1] >= len(STAGES):
+            stage = "unknown"
+        else:
+            stage = STAGES[game_info_block[STATE_OFFSET + 1]]
         
         # Get player characters
         for i in range(4):

@@ -578,12 +578,16 @@ class GRUDApp:
 
         if not folders_to_zip:
             printerror("No folders to zip. Exiting function")
+            self.state = "ready"
             return
 
 
         # Rename SLP files
         for folder in folders_to_zip:
-            slp_parser.adjust_names(folder)
+            try:
+                slp_parser.adjust_names(folder)
+            except Exception as e:
+                logger.error(f"Failed to rename files in folder {folder}", exc_info=sys.exc_info())
 
 
         archives_to_send = []

@@ -66,7 +66,7 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, remove=Tr
 
 
     if archives == 1: 
-        with zipfile.ZipFile(f"{path}.zip", "w", zipfile.ZIP_LZMA, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
+        with zipfile.ZipFile(f"{path}.zip", "w", comp_algo, compresslevel=9) as zipf: # compresslevel does nothing with LZMA
             for file in files:
                 zipf.write(f"{path}/{file}", arcname=file)
                 if compressed_files is not None:
