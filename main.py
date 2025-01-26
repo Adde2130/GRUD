@@ -904,6 +904,13 @@ class GRUDApp:
             src = os.path.join(self.temp_dir, file)
             dst = os.path.join(self.recovered, file)
 
+            count = 1
+            while os.path.exists(dst):
+                count += 1
+                
+                dst = os.path.join(self.recovered, file)
+                dst += f" ({count})"
+
             shutil.move(src, dst)
 
         os.rmdir(self.temp_dir)

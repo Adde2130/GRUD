@@ -104,14 +104,23 @@ class GRUDBot(Bot):
     async def remove_msgs(self, message_count: int):
         try:
             if self.replay_channel:
-                messages = [message async for message in self.replay_channel.history(limit=message_count)]
-                if messages:
-                    await self.replay_channel.delete_messages(messages)
-                    print(f"Successfully deleted {message_count} messages.")
-                else:
+                messages = [
+                        message async for message in self.replay_channel.history(limit=100)
+                        if message.author.id == self.user.id
+                ]
+
+                messages = messages[:message_count]
+
+                if not messages:
                     print(f"No messages found to delete.")
+                    return
+
+                for message in messages:
+                    await message.delete()
+
+                print(f"Successfully deleted {message_count} messages.")
         except HTTPException as e:
-            print(f"Failed to delete messages: {e}")
+            print(f"Failed to delete message: {e}")
 
 
 
