@@ -7,6 +7,7 @@ from discord.ext.commands import Bot
 from discord.errors import HTTPException, LoginFailure, NotFound
 from aiohttp.client_exceptions import ClientConnectorDNSError
 
+# Ref: https://discordpy.readthedocs.io/en/stable/api.html
 class GRUDBot(Bot):
     def __init__(self, replay_channel_id: int):
         intents = discord.Intents.default()

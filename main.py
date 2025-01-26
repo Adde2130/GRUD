@@ -160,7 +160,7 @@ class GRUDApp:
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
             "example_message", "msg_box", "send_message_box", "options_pane", "listbox_pane", "text_pane", "listbox_font",
-            "input_field", "entry", "bot_label", "bot_status", "selected_item_index",
+            "input_field", "entry", "bot_status", "selected_item_index", "server_label", "channel_label",
             "transfer_button", "open_drives_button", "download_button", "anim_counter",
             "scale_x", "scale_y", "progress_bar"
     )
@@ -237,7 +237,7 @@ class GRUDApp:
     def initGUI(self):
         self.root = customtkinter.CTk(fg_color=COLORS["GRAY"])
         self.root.title("GRUD")
-        self.root.geometry("1000x440")
+        self.root.geometry("1000x450")
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.root.resizable(False, False)
 
@@ -289,7 +289,7 @@ class GRUDApp:
         self.msg_box.bind("<FocusIn>", self.msg_focus_in)
         self.msg_box.bind("<FocusOut>", self.msg_focus_out)
 
-        self.options_pane.grid(row=1, column=1, pady=(78, 0), sticky="n")
+        self.options_pane.grid(row=1, column=1, pady=(0, 0), sticky="n")
         
         # List of drives
         self.listbox_pane = customtkinter.CTkFrame(self.root, fg_color=COLORS["GRAY"])
@@ -312,10 +312,15 @@ class GRUDApp:
         # Bot status (rename this?)
         self.text_pane = customtkinter.CTkFrame(self.root, fg_color=COLORS["GRAY"])
 
-        self.bot_label = customtkinter.CTkLabel(self.text_pane, text="GRUDBot Status", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"], anchor="center")
-        self.bot_label.grid(row=0, column=0,  padx=0)
+        self.server_label = customtkinter.CTkLabel(self.text_pane, text="[Server Name]", font=("Cascadia Code", 24, "bold"), text_color=COLORS["MAGENTA"], anchor="center")
+        self.server_label.grid(row=0, column=0,  padx=0)
+
+        self.channel_label = customtkinter.CTkLabel(self.text_pane, text="[Channel Name]", font=("Cascadia Code", 24, "bold"), text_color=COLORS["BLUE"])
+        self.channel_label.grid(row=1, column=0, pady=0)
+
         self.bot_status = customtkinter.CTkLabel(self.text_pane, text="Connecting...", font=("Cascadia Code", 24, "bold"), text_color=COLORS["YELLOW"], anchor="center")
-        self.bot_status.grid(row=1, column=0, padx=(0,0))
+        self.bot_status.grid(row=2, column=0, padx=(0,0), pady=20)
+
 
         self.text_pane.grid(row=0, column=1, pady=(20, 0), sticky="n")
 
@@ -334,6 +339,8 @@ class GRUDApp:
 
 
         self.progress_bar = ttk.Progressbar(self.text_pane, length=200 * self.scale_x, maximum=1)
+        self.progress_bar.grid(row=3, column=0)
+        self.progress_bar.grid_remove()
 
         # Animation
         self.anim_counter = 0
@@ -374,7 +381,7 @@ class GRUDApp:
 
 
                 if self.grudbot.error == "LoginFailure":
-                    self.bot_status.grid_forget()
+                    self.bot_status.grid_remove()
                     self.bot_status.configure(text="Invalid API key!", text_color=COLORS["RED"], anchor="n")
                     self.bot_status.grid(row=2, column=2, padx=0)
                     self.state = "zip_only_mode"
@@ -382,7 +389,7 @@ class GRUDApp:
                     return
 
                 elif self.grudbot.error == "ChannelNotFound":
-                    self.bot_status.grid_forget()
+                    self.bot_status.grid_remove()
                     self.bot_status.configure(text="Channel not found!", text_color=COLORS["RED"], anchor="n")
                     self.bot_status.grid(row=2, column=2, padx=0)
                     self.state = "zip_only_mode"
@@ -390,7 +397,7 @@ class GRUDApp:
                     return
 
                 elif self.grudbot.error == "NoInternet":
-                    self.bot_status.grid_forget()
+                    self.bot_status.grid_remove()
                     self.bot_status.configure(text="No internet!", text_color=COLORS["RED"], anchor="n")
                     self.bot_status.grid(row=2, column=2, padx=0)
                     self.state = "zip_only_mode"
@@ -400,9 +407,14 @@ class GRUDApp:
                 elif self.grudbot.connected:
                     self.state = "ready"
                     
-                    self.bot_status.grid_forget()
+                    self.bot_status.grid_remove()
+
+                    server_name = self.grudbot.replay_channel.guild.name
+                    channel_name = self.grudbot.replay_channel.name                    
+                    self.server_label.configure(text=server_name)
+                    self.channel_label.configure(text=channel_name)
                     self.bot_status.configure(text="Ready", text_color=COLORS["LIGHT_GREEN"])
-                    self.bot_status.grid(row=1, column=0, padx=0)
+                    self.bot_status.grid()
                 else:
                     text = dotdotdot("Connecting", self.anim_counter / 13 % 3 + 1)
                     self.bot_status.configure(text=text)
@@ -430,17 +442,17 @@ class GRUDApp:
 
                 self.download_button.config(text="Zip")
 
-                self.bot_status.grid_forget()
+                self.bot_status.grid_remove()
                 self.bot_status.configure(text="Zip-only mode", text_color=COLORS["ORANGE"])
-                self.bot_status.grid(row=1, column=0)
+                self.bot_status.grid(row=2, column=0)
 
             case "invalid_settings":
 
                 self.disable_widget(self.download_button)
                 message = "Invalid settings.json!\nCheck your syntax"
-                self.bot_status.grid_forget()
+                self.bot_status.grid_remove()
                 self.bot_status.configure(text=message, text_color=COLORS["RED"])
-                self.bot_status.grid(row=1, column=0)
+                self.bot_status.grid(row=2, column=0)
 
                 self.state = "zip_only_mode"
                 self.root.after(2500, self.update_status)
@@ -460,7 +472,7 @@ class GRUDApp:
                 self.enable_widget(self.transfer_button)
                 self.enable_widget(self.keep_copy_box)
                 self.enable_widget(self.send_message_box)
-                self.progress_bar.grid_forget()
+                self.progress_bar.grid_remove()
 
                 if self.keep_copy_box.get() == 1:
                     self.enable_widget(self.path_button)
@@ -487,17 +499,17 @@ class GRUDApp:
                 self.disable_widget(self.send_message_box)
 
                 if self.state == "zipping":
-                    self.progress_bar.grid(row=2, column=0)
+                    self.progress_bar.grid(row=3, column=0)
                     if self.files_compressed is not None:
                         self.progress_bar["value"] = len(self.files_compressed) / (len(self.files_to_compress)) 
                 else:
-                    self.progress_bar.grid_forget()
+                    self.progress_bar.grid_remove()
 
                 text = dotdotdot(self.state.capitalize(), self.anim_counter / 13 % 3 + 1)
                 self.bot_status.configure(text=text, text_color=COLORS["YELLOW"])
 
             case "error_thrown":
-                self.options_pane.grid_forget()
+                self.options_pane.grid_remove()
                 
                 self.bot_status.configure(text=self.error_msg, text_color=COLORS["RED"])
 
@@ -1033,7 +1045,7 @@ class GRUDApp:
             elif widget is self.keep_copy_box or widget is self.send_message_box:
                 widget.configure(state=tk.DISABLED)
             elif widget is self.progress_bar:
-                widget.grid_forget()
+                widget.grid_remove()
                 widget.configure(state=tk.DISABLED)
             else:
                 widget.config(state=tk.DISABLED)
