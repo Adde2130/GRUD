@@ -510,6 +510,9 @@ class GRUDApp:
 
             case "error_thrown":
                 self.options_pane.grid_remove()
+                self.progress_bar.grid_remove()
+                self.server_label.grid_remove()
+                self.channel_label.grid_remove()
                 
                 self.bot_status.configure(text=self.error_msg, text_color=COLORS["RED"])
 
