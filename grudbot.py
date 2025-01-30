@@ -2,9 +2,10 @@ import discord
 import os
 import argparse
 import json
+import time
 
 from discord.ext.commands import Bot
-from discord.errors import HTTPException, LoginFailure, NotFound
+from discord.errors import HTTPException, LoginFailure, NotFound, Forbidden
 from aiohttp.client_exceptions import ClientConnectorDNSError
 
 # Ref: https://discordpy.readthedocs.io/en/stable/api.html
@@ -20,20 +21,16 @@ class GRUDBot(Bot):
 
 
     # Poor man's multithreading exception handling
-    def run(self, apikey: str, message="", file=""):
-        self.message = message
-        self.file = file
+    def run(self, apikey: str, start_func=None, logging=False):
+        self.start_func = start_func
 
         try:
-            if message or file:
-                super().run(apikey)
-            else:
-                super().run(apikey, log_handler=None)
+            super().run(apikey)
+
         except LoginFailure as e:
             self.error = "LoginFailure"
             raise e # We still WANT the thread to crash
         except ClientConnectorDNSError as e:
-            print(type(e))
             self.error = "NoInternet"
             raise e
 
@@ -54,11 +51,8 @@ class GRUDBot(Bot):
         self.connected = True
         print("GRUDBot logged in")
 
-        if self.message or self.file:
-            if self.message:
-                await self.send_message(self.message)
-            if self.file:
-                await self.send_file(self.file)
+        if self.start_func is not None:
+            await self.start_func
             await self.close()
 
 
@@ -77,13 +71,6 @@ class GRUDBot(Bot):
         if message == "":
             return
 
-        if message[0:2] == "rm":
-            try:
-                msgs = int(message[2:].strip())
-                await self.remove_msgs(msgs)
-                return
-            except ValueError as e:
-                pass
 
         if "@" in message:
             for member in self.replay_channel.guild.members:
@@ -101,7 +88,30 @@ class GRUDBot(Bot):
         await self.replay_channel.send(content=message)
 
 
-    async def remove_msgs(self, message_count: int):
+    async def remove_message(self, message_id: int, channel_id=None) -> None:
+        if channel_id is None:
+            channel = self.replay_channel
+        else:
+            channel = self.get_channel(channel_id)
+
+        try:
+            msg = await channel.fetch_message(message_id)
+        except NotFound:
+            print("Message not found!")
+            return
+        except Forbidden:
+            print("Insufficient permissions!")
+            return
+
+
+        try:
+            await msg.delete()
+        except Forbidden:
+            print("You don't have permission to remove this message")
+            
+
+
+    async def remove_messages(self, message_count: int) -> None:
         try:
             if self.replay_channel:
                 messages = [
@@ -130,8 +140,11 @@ if __name__ == "__main__":
         exit(-1)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("message", nargs="?", type=str)
-    parser.add_argument("--file", "-f", type=str, help="Path to file to send")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--message", "-m", type=str, help="Send a message")
+    group.add_argument("--file", "-f", type=str, help="Send a file")
+    group.add_argument("--remove-message", "-rm", type=int, help="Remove message with the provided messageID")
 
     args = parser.parse_args()
 
@@ -139,13 +152,18 @@ if __name__ == "__main__":
         if not os.path.exists(args.file):
             print(f"\033[91mFile {args.file} not found\033[0m")
             exit(-1)
-            
-    if not args.message and not args.file:
-            print(f"\033[91mNeither message nor file specified\033[0m")
-            exit(-1)
 
     with open("settings.json", "r") as f:
         settings = json.load(f)
-    
+
+
     grud = GRUDBot(settings["ReplayChannelID"])
-    grud.run(settings["GRUDBot_APIKEY"], file=args.file, message=args.message)
+
+    if args.file:
+        coroutine = grud.send_file(args.file)
+    elif args.message:
+        coroutine = grud.send_message(args.message)
+    elif args.remove_message:
+        coroutine = grud.remove_message(args.remove_message)
+    
+    grud.run(settings["GRUDBot_APIKEY"], coroutine, logging=True)

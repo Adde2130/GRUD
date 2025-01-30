@@ -82,8 +82,12 @@ def parse_file(filename: str) -> tuple[str, str, str]:
         # Get player characters
         for i in range(4):
             offset = 0x24
-            if game_info_block[CHARACTER_TYPE_OFFSET + offset * i] != 3:
-                characters.append(CHARACTERS[game_info_block[CHARACTER_OFFSET + offset * i]])
+            char_num = game_info_block[CHARACTER_TYPE_OFFSET + offset * i]
+            if char_num != 3:
+                if char_num >= len(CHARACTERS):
+                    characters.append("unknown")
+                else:
+                    characters.append(CHARACTERS[char_num])
 
     return (stage, *characters)
 
@@ -102,6 +106,10 @@ def adjust_names(folder: str):
 
     for i, file in enumerate(files): 
         stage, *characters = parse_file(file)
-        os.rename(file, f"{folder}/{seed}_{i} - {characters[0]} VS. {characters[1]}, {stage}.slp")
+        if len(characters) == 1:
+            name = f"{folder}/{seed}_{i} - {characters[0]}, {stage}.slp"
+        else:
+            name = f"{folder}/{seed}_{i} - {characters[0]} VS. {characters[1]}, {stage}.slp"
+        os.rename(file, name)
 
 
