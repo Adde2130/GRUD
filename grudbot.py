@@ -3,6 +3,7 @@ import os
 import argparse
 import json
 import time
+import sys
 
 from discord.ext.commands import Bot
 from discord.errors import HTTPException, LoginFailure, NotFound, Forbidden
@@ -147,6 +148,11 @@ if __name__ == "__main__":
     group.add_argument("--remove-message", "-rm", type=int, help="Remove message with the provided messageID")
 
     args = parser.parse_args()
+
+    if len(sys.argv) == 1:
+        print(f"\033[91mNo args passed\033[0m")
+        exit(-1)
+
 
     if args.file:
         if not os.path.exists(args.file):
