@@ -13,7 +13,6 @@ import argparse
 import json
 import asyncio
 import shutil
-import psutil
 import sys
 import logging
 import discord
@@ -384,7 +383,7 @@ class GRUDApp:
                 if self.grudbot.error == "LoginFailure":
                     self.bot_status.grid_remove()
                     self.bot_status.configure(text="Invalid API key!", text_color=COLORS["RED"], anchor="n")
-                    self.bot_status.grid(row=2, column=2, padx=0)
+                    self.bot_status.grid()
                     self.state = "zip_only_mode"
                     self.root.after(1500, self.update_status)
                     return
@@ -392,7 +391,7 @@ class GRUDApp:
                 elif self.grudbot.error == "ChannelNotFound":
                     self.bot_status.grid_remove()
                     self.bot_status.configure(text="Channel not found!", text_color=COLORS["RED"], anchor="n")
-                    self.bot_status.grid(row=2, column=2, padx=0)
+                    self.bot_status.grid()
                     self.state = "zip_only_mode"
                     self.root.after(1500, self.update_status)
                     return
@@ -400,7 +399,7 @@ class GRUDApp:
                 elif self.grudbot.error == "NoInternet":
                     self.bot_status.grid_remove()
                     self.bot_status.configure(text="No internet!", text_color=COLORS["RED"], anchor="n")
-                    self.bot_status.grid(row=2, column=2, padx=0)
+                    self.bot_status.grid()
                     self.state = "zip_only_mode"
                     self.root.after(1500, self.update_status)
                     return
@@ -599,6 +598,9 @@ class GRUDApp:
             size_limit = 0
 
         # Fix since the lib is broken right now
+        print(version_str("discord.py"))
+        print(Version("2.4.0"))
+        print(Version(version_str("discord.py")) <= Version("2.4.0"))
         if Version(version_str("discord.py")) <= Version("2.4.0") and size_limit == 25 * 1024 * 1024:
             size_limit = 10 * 1024 * 1024
 

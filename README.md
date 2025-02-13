@@ -1,6 +1,6 @@
 # GRUD
 
-**G**ame **R**eplay **U**ploader for **D**iscord
+😱 **G**ame **R**eplay **U**ploader for **D**iscord 😱
 
 Script created in order to download replays from USB drives en masse and upload them.
 (Shoutout to Hixon for the name and idea)
@@ -18,17 +18,19 @@ is not set, the program will run in **Zip-only mode**.
 1. Run GRUD, either by launching `grud.bat` or by running `main.py` with Python. Run it with the flag `-n` or `--naked` to 
 use the program without any GUI. **NOTE:** GRUD in terminal mode is currently broken and should not be used.
 
+   You can also run it with the flag `-ws` in order to create a shortcut with the GRUD logo (Windows only).
+
 2. Check the list of drives to see if all Slippi replay folders are detected. You will see a number
 representing the amount of replay files found within each drive. 
 
    If a name is missing from any of the drives, click it to rename it. This will add a `GRUD.json` file to
-   the root of the drive which will contain the name of the setup (and more useful info in the future).
+   the root of the drive which will contain the name of the setup.
 
-   If you can't fit all of the USBs into your PC at once, press **Transfer Folders** to transfer
-   over all Slippi files form the drives currently plugged in. They will be stored locally until
-   they are sent or zipped.
+   If you can't fit all of the USBs into your PC at once, press **Store Locally** to transfer
+   over all Slippi files form the drives currently plugged in. They will be stored locally on the
+   computer until they are sent or zipped.
 
-3. Click **DOWNLOAD** to transfer the replays, zip them and then send them to the channel with the `ReplayChannelID`. 
+3. Click **Zip and Send** (Blue button) to transfer the replays, zip them and then send them to the channel with the `ReplayChannelID`. 
 
    If you want to save copies of the replays locally, check the "**Keep copy?**" box and choose a directory
    for storing the files. GRUD will save Zip archives of each setup, which may be split into parts if the
@@ -44,17 +46,17 @@ It is recommended to first create a virtual environment in Python like so:
 
 ```shell
 python -m venv .venv
+```
+Then, on Windows run:
+```shell
 .venv\Scripts\activate
 ```
-If you create a virtual environment, you want to modify `grud.bat` to activate
-your environment before launching GRUD. Add the following:
 
-```batch
-@echo off
-REM Add the line below
-call .venv\Scripts\activate 
-python "%~dp0/main.py" %*
+For Linux/MacOS, run:
+```shell
+.venv\bin\activate
 ```
+
 
 Then, install the required dependencies using the `requirements.txt` file:
 ```shell
@@ -64,4 +66,3 @@ pip install -r requirements.txt
 You should also install the fonts *Cascadia Code* and *Cascadia Code Bold* if you want the
 text to be properly aligned, as they're the fonts intended for the GUI. You can download
 them from [here](https://github.com/microsoft/cascadia-code).
-

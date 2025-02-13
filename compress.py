@@ -14,7 +14,7 @@ ZLIB_RATIO = 0.23253719347
 # NOTE: This is BLAZINGLY fast, and is prefferable if size isn't an issue
 BZIP2_RATIO = 0.21835793841
 
-MARGIN = 0.9
+BASE_MARGIN = 0.75
 
 def __divide_chunks(l, n):
     for i in range(0, len(l), n):
@@ -38,19 +38,21 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, remove=Tr
     size = get_folder_size(path)
     archives = 1
 
-    if size * BZIP2_RATIO < size_limit * MARGIN: 
+    margin = min(BASE_MARGIN * ( size_limit / 1024 / 1024 / 2), 1)
+
+    if size * BZIP2_RATIO < size_limit * margin: 
         comp_algo = zipfile.ZIP_BZIP2
         print(f"Zipping {path} with BZIP2")
     else:
         comp_algo = zipfile.ZIP_LZMA
         print(f"Zipping {path} with LZMA")
 
-        if size * LZMA_RATIO > size_limit * MARGIN:
+        if size * LZMA_RATIO > size_limit * margin:
             print(f"Zipping {path} in multiple parts")
-            while size * LZMA_RATIO / archives > size_limit * MARGIN:
+            while size * LZMA_RATIO / archives > size_limit * margin:
                 archives += 1
 
-                if size * BZIP2_RATIO / archives > size_limit * MARGIN:
+                if size * BZIP2_RATIO / archives > size_limit * margin:
                     comp_algo = zipfile.ZIP_LZMA
                     break
 
