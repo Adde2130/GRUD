@@ -26,7 +26,8 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from pathvalidate import sanitize_filename
 from tkinter import ttk
-from importlib.metadata import version
+from importlib.metadata import version as version_str
+from packaging.version import Version
 
 if os.name == "nt":
     from ctypes import windll
@@ -598,7 +599,7 @@ class GRUDApp:
             size_limit = 0
 
         # Fix since the lib is broken right now
-        if version("discord.py") >= "2.4.0" and size_limit == 25 * 1024 * 1024:
+        if Version(version_str("discord.py")) <= Version("2.4.0") and size_limit == 25 * 1024 * 1024:
             size_limit = 10 * 1024 * 1024
 
 
@@ -1102,11 +1103,11 @@ def main():
         dev_state = "sending"
 
     # Create shortcut (Windows only)
-    if args.ws and os.name == "nt":
+    if os.name == "nt" and args.ws:
         shell = client.Dispatch("WScript.Shell")
         dir = os.path.dirname(os.path.realpath(__file__))
         shortcut = shell.CreateShortcut(f"{dir}/GRUD.lnk")
-        shortcut.TargetPath = f"{dir}\\grud.vbs"
+        shortcut.TargetPath = f"{dir}\\grud.bat"
         shortcut.IconLocation = f"{dir}\\res\\grudbot.ico"
         shortcut.save()
         exit(0)

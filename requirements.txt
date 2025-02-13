@@ -1,7 +1,6 @@
 aiohttp==3.10.10
 customtkinter==5.2.2
 discord.py==2.4.0
-audioop-lts==0.2.1
+audioop-lts==0.2.1; python_version >= "3.13"
 pathvalidate==3.2.1
-psutil==6.1.0
-pywin32==307
+pywin32==307; sys_platform == "win32"
