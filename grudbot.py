@@ -68,7 +68,7 @@ class GRUDBot(Bot):
         except HTTPException as e:
             raise e
 
-    async def send_message(self, message: str):
+    async def send_message(self, message: str, reply_message_id=None):
         if message == "":
             return
 
@@ -86,7 +86,12 @@ class GRUDBot(Bot):
             message = message.replace(f"@Everyone", "@everyone")
 
 
-        await self.replay_channel.send(content=message)
+        if reply_message_id:
+            _message = await self.replay_channel.fetch_message(reply_message_id)
+            await _message.reply(content=message)
+
+        else:
+            await self.replay_channel.send(content=message)
 
 
     async def remove_message(self, message_id: int, channel_id=None) -> None:
@@ -146,6 +151,7 @@ if __name__ == "__main__":
     group.add_argument("--message", "-m", type=str, help="Send a message")
     group.add_argument("--file", "-f", type=str, help="Send a file")
     group.add_argument("--remove-message", "-rm", type=int, help="Remove message with the provided messageID")
+    group.add_argument("--reply", "-r", nargs=2, help="Remove message with the provided messageID")
 
     args = parser.parse_args()
 
@@ -171,5 +177,7 @@ if __name__ == "__main__":
         coroutine = grud.send_message(args.message)
     elif args.remove_message:
         coroutine = grud.remove_message(args.remove_message)
+    elif args.reply:
+        coroutine = grud.send_message(args.reply[0], reply_message_id=args.reply[1])
     
     grud.run(settings["GRUDBot_APIKEY"], coroutine, logging=True)
