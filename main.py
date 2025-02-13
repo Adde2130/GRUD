@@ -29,7 +29,7 @@ from importlib.metadata import version as version_str
 from packaging.version import Version
 
 if os.name == "nt":
-    from ctypes import windll
+    from ctypes import windll, byref, create_unicode_buffer, create_string_buffer
     from win32com import client
     import win32api
 
@@ -63,6 +63,8 @@ sys.excepthook = handle_exception
 COLORS = {"GRAY" : "#282828", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
           "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2", "ORANGE" : "#f7c54f",
           "PINK": "#ffb6c1"}
+
+
 
 
 class ReplayState(Enum):
@@ -1066,6 +1068,33 @@ class GRUDApp:
                 widget.configure(state=tk.DISABLED)
             else:
                 widget.config(state=tk.DISABLED)
+
+    # TODO: Use this for loading fonts on windows
+    def loadfont(self, fontpath, private=True, enumerable=False):
+        '''
+        Makes fonts located in file `fontpath` available to the font system.
+
+        `private`     if True, other processes cannot see this font, and this
+                      font will be unloaded when the process dies
+        `enumerable`  if True, this font will appear when enumerating fonts
+
+        See https://msdn.microsoft.com/en-us/library/dd183327(VS.85).aspx
+
+        '''
+        # This function was taken from
+        # https://github.com/ifwe/digsby/blob/f5fe00244744aa131e07f09348d10563f3d8fa99/digsby/src/gui/native/win/winfonts.py#L15
+        if isinstance(fontpath, bytes):
+            pathbuf = create_string_buffer(fontpath)
+            AddFontResourceEx = windll.gdi32.AddFontResourceExA
+        elif isinstance(fontpath, str):
+            pathbuf = create_unicode_buffer(fontpath)
+            AddFontResourceEx = windll.gdi32.AddFontResourceExW
+        else:
+            raise TypeError('fontpath must be of type str or unicode')
+
+        flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
+        numFontsAdded = AddFontResourceEx(byref(pathbuf), flags, 0)
+        return bool(numFontsAdded)
 
 
 def printerror(message: str):
