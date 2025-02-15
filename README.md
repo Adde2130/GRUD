@@ -54,7 +54,7 @@ Then, on Windows run:
 
 For Linux/MacOS, run:
 ```shell
-.venv\bin\activate
+source .venv/bin/activate
 ```
 
 
