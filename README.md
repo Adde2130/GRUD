@@ -1,3 +1,5 @@
+![GRUD 😱](https://imgur.com/a/bGHVQ5o)
+
 # GRUD
 
 😱 **G**ame **R**eplay **U**ploader for **D**iscord 😱
@@ -12,8 +14,7 @@ and `ReplayChannelID` values for the GRUDBot to send the message to your channel
 is not set, the program will run in **Zip-only mode**.
 
    You also need to add the GRUDBot to your server if you want to send a Discord message with the files attached. ***Right now, you
-   will have to host your OWN GRUDBot for this to work.*** For the optimal experience, ensure you have the
-   *Cascadia Code* font installed, or text may be misaligned. (TODO: Have font included in project)
+   will have to host your OWN GRUDBot for this to work.***
 
 1. Run GRUD, either by launching `grud.bat` or by running `main.py` with Python. Run it with the flag `-n` or `--naked` to 
 use the program without any GUI. **NOTE:** GRUD in terminal mode is currently broken and should not be used.
@@ -63,6 +64,6 @@ Then, install the required dependencies using the `requirements.txt` file:
 pip install -r requirements.txt
 ```
 
-You should also install the fonts *Cascadia Code* and *Cascadia Code Bold* if you want the
-text to be properly aligned, as they're the fonts intended for the GUI. You can download
-them from [here](https://github.com/microsoft/cascadia-code).
+If you are on Linux or Mac, you should also install the fonts *Cascadia Code* and
+*Cascadia Code Bold* if you want the text to be properly aligned, as they're the fonts
+used for the GUI. You can download them from [here](https://github.com/microsoft/cascadia-code).

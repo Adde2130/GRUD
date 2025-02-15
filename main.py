@@ -252,6 +252,10 @@ class GRUDApp:
         
             self.root.iconbitmap(fr"res/grudbot.ico")
 
+            # TODO: Test if this actually works
+            self.loadfont("res/CascadiaCode.ttf", enumerable=True)
+            
+
         # Get upscaling from high-DPI monitors
         scale = self.root.tk.call("tk", "scaling")
 
@@ -1069,7 +1073,6 @@ class GRUDApp:
             else:
                 widget.config(state=tk.DISABLED)
 
-    # TODO: Use this for loading fonts on windows
     def loadfont(self, fontpath, private=True, enumerable=False):
         '''
         Makes fonts located in file `fontpath` available to the font system.
@@ -1092,9 +1095,12 @@ class GRUDApp:
         else:
             raise TypeError('fontpath must be of type str or unicode')
 
+        FR_PRIVATE  = 0x10
+        FR_NOT_ENUM = 0x20
+
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
         numFontsAdded = AddFontResourceEx(byref(pathbuf), flags, 0)
-        return bool(numFontsAdded)
+        return numFontsAdded
 
 
 def printerror(message: str):
