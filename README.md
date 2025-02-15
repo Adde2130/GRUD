@@ -1,4 +1,4 @@
-![GRUD 😱](https://imgur.com/a/bGHVQ5o)
+![GRUD 😱](https://i.imgur.com/Rtipuvi.png)
 
 # GRUD
 
