@@ -1,11 +1,11 @@
-![GRUD 😱](https://i.imgur.com/Rtipuvi.png)
-
-# GRUD
-
-😱 **G**ame **R**eplay **U**ploader for **D**iscord 😱
-
-Script created in order to download replays from USB drives en masse and upload them.
-(Shoutout to Hixon for the name and idea)
+<p align="center">
+   <img src="https://i.imgur.com/Rtipuvi.png"><br>
+   <h1 align="center">😱 Game Replay Uploader for Discord 😱</h1> <br>
+   <img src="https://i.imgur.com/qfNmWQM.png">
+   <p align="center">App created in order to download replays from USB drives en masse and upload them.
+   (Shoutout to Hixon for the name and idea)
+   <p align="center"></p> <br>
+<p>
 
 
 ## How to use
@@ -27,11 +27,13 @@ representing the amount of replay files found within each drive.
    If a name is missing from any of the drives, click it to rename it. This will add a `GRUD.json` file to
    the root of the drive which will contain the name of the setup.
 
+   <p><img src=https://i.imgur.com/ysPbes8.gif></p>
+
    If you can't fit all of the USBs into your PC at once, press **Store Locally** to transfer
    over all Slippi files form the drives currently plugged in. They will be stored locally on the
    computer until they are sent or zipped.
 
-3. Click **Zip and Send** (Blue button) to transfer the replays, zip them and then send them to the channel with the `ReplayChannelID`. 
+4. Click **Zip and Send** (Blue button) to transfer the replays, zip them and then send them to the channel with the `ReplayChannelID`. 
 
    If you want to save copies of the replays locally, check the "**Keep copy?**" box and choose a directory
    for storing the files. GRUD will save Zip archives of each setup, which may be split into parts if the
