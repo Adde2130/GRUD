@@ -60,6 +60,11 @@ For Linux/MacOS, run:
 source .venv/bin/activate
 ```
 
+If you're on Linux, you may also have to install the tk package
+```shell
+pacman -S tk
+```
+
 
 Then, install the required dependencies using the `requirements.txt` file:
 ```shell
@@ -68,4 +73,4 @@ pip install -r requirements.txt
 
 If you are on Linux or Mac, you should also install the fonts *Cascadia Code* and
 *Cascadia Code Bold* if you want the text to be properly aligned, as they're the fonts
-used for the GUI. You can download them from [here](https://github.com/microsoft/cascadia-code).
+used for the GUI. You can download them from [here](https://github.com/microsoft/cascadia-code) or using a package manager.
