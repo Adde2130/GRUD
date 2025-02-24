@@ -16,6 +16,7 @@ import shutil
 import sys
 import logging
 import discord
+import psutil
 
 from enum import Enum
 from concurrent.futures import ProcessPoolExecutor
@@ -201,13 +202,17 @@ class GRUDApp:
         # Check for windows
         if os.name == "nt":
             self.appdata = os.path.join(os.environ["APPDATA"], "GRUD")
-            if not os.path.isdir(self.appdata):
-                os.mkdir(self.appdata)
 
             windll.shcore.SetProcessDpiAwareness(1) # Laptop/upscaling fix
+        elif os.name == "posix":
+            self.appdata = os.path.join(os.environ["HOME"], ".config/grud")
         else:
-            printerror("Only Windows is supported in this version of GRUD")
+            printerror("Your OS is not supported in this version of GRUD")
             exit(1)
+
+        if not os.path.isdir(self.appdata):
+            os.mkdir(self.appdata)
+
 
         self.temp_dir = os.path.join(self.appdata, ".temp")
         if not os.path.isdir(self.temp_dir):
@@ -719,9 +724,22 @@ class GRUDApp:
         if not self.can_refresh:
             return
 
+        drives = []
+        for part in psutil.disk_partitions():
+            print(part.mountpoint)
+            if "removable" in part.opts:
+                drives.append(part.mountpoint)
+
+        if len(drives) == 0:
+            return
+
         if os.name == "nt":
             drives = [f"{d}:/" for d in string.ascii_uppercase if os.path.exists(f"{d}:/")]
             get_uuid = lambda drive: win32api.GetVolumeInformation(drive)[1]
+        elif os.name == "posix":
+            printerr("Posix systems right now are not supported!")
+            exit(1)
+            pass
 
 
         replay_folders = []
@@ -1103,7 +1121,7 @@ class GRUDApp:
         return numFontsAdded
 
 
-def printerror(message: str):
+def printerror(message):
     print(f"\033[91m{message}\033[0m")
 
 
