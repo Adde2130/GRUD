@@ -4,10 +4,24 @@ import argparse
 import json
 import time
 import sys
+import logging
 
 from discord.ext.commands import Bot
 from discord.errors import HTTPException, LoginFailure, NotFound, Forbidden
 from aiohttp.client_exceptions import ClientConnectorDNSError
+
+# Make the logger stop clogging the log file
+discord_logger = logging.getLogger('discord')
+discord_logger.propagate = False
+
+for handler in discord_logger.handlers[:]:
+    discord_logger.removeHandler(handler)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+
+discord_logger.addHandler(stream_handler)
+
 
 # Ref: https://discordpy.readthedocs.io/en/stable/api.html
 class GRUDBot(Bot):
@@ -26,7 +40,7 @@ class GRUDBot(Bot):
         self.start_func = start_func
 
         try:
-            super().run(apikey)
+            super().run(apikey, log_handler=handler)
 
         except LoginFailure as e:
             self.error = "LoginFailure"
