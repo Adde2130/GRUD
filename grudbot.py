@@ -170,8 +170,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
-        print(f"\033[91mNo args passed\033[0m")
-        exit(-1)
+        parser.print_help()
+        exit(1)
 
 
     if args.file:
