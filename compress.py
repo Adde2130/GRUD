@@ -35,10 +35,11 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, remove=Tr
     if size_limit == 0:
         size_limit = 0xFFFFFFFF # 4GB
 
+
     size = get_folder_size(path)
     archives = 1
 
-    margin = min(BASE_MARGIN * ( size_limit / 1024 / 1024 / 2), 1)
+    margin = min(BASE_MARGIN + ( size_limit / 1024 / 1024 / 2 / 100 ), 1)
 
     if size * BZIP2_RATIO < size_limit * margin: 
         comp_algo = zipfile.ZIP_BZIP2

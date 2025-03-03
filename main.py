@@ -64,7 +64,40 @@ COLORS = {"GRAY" : "#282828", "LIGHT_GREEN" : "#74e893", "YELLOW" : "#faf48c",
           "MAGENTA" : "#d953e6", "RED" : "#f54251", "BLUE" : "#8ab2f2", "ORANGE" : "#f7c54f",
           "PINK": "#ffb6c1"}
 
+# I hate that I have to do this but tkinter is the biggest pile of dogshit ever created,
+# why in the everlonging fuck would I need to do all this to have custom exception handling?
+# This took me over an hour to figure out
+class LoggedCTk(customtkinter.CTk):
+    def __init__(self, fg_color):
+        super().__init__(fg_color=fg_color)
+        
+        sys.stderr = self._LoggerStream(logger, sys.stderr)
+        
+        self.report_callback_exception = self._log_tkinter_error
 
+    class _LoggerStream:
+        """Custom stream to redirect stderr to the logger."""
+        def __init__(self, logger, original_stderr):
+            self.logger = logger
+            self.original_stderr = original_stderr
+
+        def write(self, message):
+            if message.strip():  # Skip empty messages
+                self.logger.error(message.strip())
+
+            self.original_stderr.write(message)
+
+        def flush(self):
+            self.original_stderr.flush()
+
+    def _log_tkinter_error(self, exc, val, tb):
+        """Log Tkinter callback exceptions (e.g., button clicks)."""
+        logger.error(
+            "Exception in Tkinter callback",
+            exc_info=(exc, val, tb)
+        )
+
+        super().report_callback_exception(exc, val, tb)
 
 
 class ReplayState(Enum):
@@ -235,9 +268,9 @@ class GRUDApp:
 
         self.refresh_drives()
 
-        
+
     def initGUI(self):
-        self.root = customtkinter.CTk(fg_color=COLORS["GRAY"])
+        self.root = LoggedCTk(fg_color=COLORS["GRAY"])
         self.root.title("GRUD")
         self.root.geometry("1000x450")
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
@@ -604,9 +637,6 @@ class GRUDApp:
             size_limit = 0
 
         # Fix since the lib is broken right now
-        print(version_str("discord.py"))
-        print(Version("2.4.0"))
-        print(Version(version_str("discord.py")) <= Version("2.4.0"))
         if Version(version_str("discord.py")) <= Version("2.4.0") and size_limit == 25 * 1024 * 1024:
             size_limit = 10 * 1024 * 1024
 
