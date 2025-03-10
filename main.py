@@ -626,6 +626,7 @@ class GRUDApp:
             try:
                 slp_parser.adjust_names(folder)
             except Exception as e:
+                print(f"Failed to rename files in folder {folder}")
                 logger.error(f"Failed to rename files in folder {folder}", exc_info=sys.exc_info())
 
 
