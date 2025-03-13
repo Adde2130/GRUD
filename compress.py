@@ -4,6 +4,7 @@ import os
 import shutil
 import argparse
 import time
+import uuid
 
 '''Rough estimations for SLP file compression'''
 
@@ -35,10 +36,11 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, remove=Tr
     if size_limit == 0:
         size_limit = 0xFFFFFFFF # 4GB
 
+
     size = get_folder_size(path)
     archives = 1
 
-    margin = min(BASE_MARGIN * ( size_limit / 1024 / 1024 / 2), 1)
+    margin = min(BASE_MARGIN + ( size_limit / 1024 / 1024 / 2 / 100 ), 1)
 
     if size * BZIP2_RATIO < size_limit * margin: 
         comp_algo = zipfile.ZIP_BZIP2
@@ -90,6 +92,83 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, remove=Tr
 
     return archives
 
+def compress_new(path: str, size_limit: int, compressed_files=None, remove=False, verbose=False):
+    if size_limit == 0:
+        size_limit = 0xFFFFFFFF # 4GB
+
+    path = os.path.abspath(path)
+
+    files = [
+        os.path.join(path, f)
+        for f in os.listdir(path)
+        if f.endswith(".slp")
+    ]
+
+
+    algo = zipfile.ZIP_BZIP2
+    compression_ratio = 1 / 4
+
+    folder_size = os.path.getsize(path)
+
+    # If we have to create more than one archive, just switch the
+    # compression algorithm since we don't want too many parts
+    if folder_size > size_limit * 4.5:
+        algo = zipfile.ZIP_LZMA
+        compression_ratio = 1 / 6
+
+
+    archive_name = f"{path} part 1.zip"
+    archive_num = 1
+    archive = zipfile.ZipFile(archive_name, "w", algo, compresslevel=9) 
+
+    archives = [archive_name]
+
+    for file in files:
+        file_size = os.path.getsize(file)
+        archive_size = os.path.getsize(archive_name)
+
+        print(
+            f"ARCHIVE SIZE: \033[96;1m{round(archive_size / 1024 / 1024, 2)}\033[0mMB, "
+            f"FILE SIZE: \033[93;1m{round(file_size / 1024 / 1024, 2)}\033[0mMB",
+            f"COMPRESSED FILE SIZE: \033[91;1m{round(file_size / 1024 / 1024 * compression_ratio, 2)}\033[0mMB"
+        )
+
+        
+        if archive_size + file_size * compression_ratio > size_limit:
+            if verbose:
+                print(f"\033[94mCreating new archive! {archive_num}\033[39m")
+            archive.close()
+            
+            archive_num += 1
+
+            archive_name = f"{path} part {archive_num}.zip"
+            archive = zipfile.ZipFile(archive_name, "w", algo, compresslevel=9) 
+            archives.append(archive_name)
+
+        archive.write(file)
+        if compressed_files is not None:
+            compressed_files.append(file)
+
+    archive.close()
+
+    if len(archives) == 1:
+        archive_name = f"{path}.zip"
+        old_archive_name = archives[0]
+        archives[0] = archive_name
+        if os.path.exists(archive_name):
+            new_name = f"{uuid.uuid4()}.zip"
+            print(f"Filename already exists!!! Big whoopsie. Renaming it to {new_name} instead.")
+            os.rename(old_archive_name, new_name)
+        else:
+            os.rename(old_archive_name, archive_name)
+
+    if remove:
+        # I know ignoring is bad but testing multiprocessing is a pain,
+        # and SU replays have already been fucked multiple times due to
+        # this rmtree function.
+        shutil.rmtree(path, ignore_errors=True)
+
+    return archives
 
 def main():
     parser = argparse.ArgumentParser()
@@ -103,17 +182,7 @@ def main():
         print("Invalid path")
         return
 
-    
-    print("Compressing...")
-
-    start = time.time()
-    compress_folder(path, 0, remove=False)
-    end = time.time()
-
-    print(f"Size: {os.path.getsize(f"{path}.zip") / 1024 / 1024}MB")
-    print(f"Time: {end - start} seconds")
-    os.remove(f"{path}.zip")
-
+    print(compress_new(path, 50 * 1024 * 1024, remove=False, verbose=True))
 
 if __name__ == "__main__":
     main()

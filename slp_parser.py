@@ -24,7 +24,7 @@ EVENT_PAYLOADS_OFFSET = 0xF
 STATE_OFFSET = 0xE
 
 CHARACTER_OFFSET = 0x60
-CHARACTER_TYPE_OFFSET = 0x61 # Player, CPU, Demo, None
+PLAYER_TYPE = 0x61 # Player, CPU, Demo, None
 
 
 CHARACTERS = (
@@ -78,16 +78,18 @@ def parse_file(filename: str) -> tuple[str, str, str]:
             stage = "unknown"
         else:
             stage = STAGES[game_info_block[STATE_OFFSET + 1]]
-        
+
         # Get player characters
         for i in range(4):
             offset = 0x24
-            char_num = game_info_block[CHARACTER_TYPE_OFFSET + offset * i]
-            if char_num != 3:
-                if char_num >= len(CHARACTERS):
+            player_type = game_info_block[PLAYER_TYPE + offset * i]
+            character = game_info_block[CHARACTER_OFFSET + offset * i]
+
+            if player_type != 3:
+                if player_type >= len(CHARACTERS):
                     characters.append("unknown")
                 else:
-                    characters.append(CHARACTERS[char_num])
+                    characters.append(CHARACTERS[character])
 
     return (stage, *characters)
 
