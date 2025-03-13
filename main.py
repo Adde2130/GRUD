@@ -190,7 +190,7 @@ class GRUDApp:
             "settings", "editing_drive_name", "replay_folders",
             "state", "download_path", "appdata", "temp_dir",
             "grudbot", "bot_thread", "recovered", "files_to_compress",
-            "files_compressed", "can_refresh", "error_msg",
+            "files_compressed", "files_to_send", "files_sent", "can_refresh", "error_msg",
 
             # GUI 
             "root", "keep_copy_box", "path_button", "listbox", "entry",
@@ -211,6 +211,8 @@ class GRUDApp:
         self.replay_folders = []
         self.files_to_compress = []
         self.files_compressed = None 
+        self.files_to_send = 0
+        self.files_sent = 0
 
         if self.settings is None:
             self.settings = {
@@ -541,6 +543,10 @@ class GRUDApp:
                     self.progress_bar.grid(row=3, column=0)
                     if self.files_compressed is not None:
                         self.progress_bar["value"] = len(self.files_compressed) / (len(self.files_to_compress)) 
+                elif self.state == "sending":
+                    self.progress_bar.grid(row=3, column=0)
+                    if self.files_sent is not None:
+                        self.progress_bar["value"] = self.files_sent / self.files_to_send
                 else:
                     self.progress_bar.grid_remove()
 
@@ -662,6 +668,7 @@ class GRUDApp:
                         folder, 
                         size_limit,
                         compressed_files=self.files_compressed,
+                        verbose=False,
                     )
                     for folder in folders_to_zip
                 ]
@@ -688,19 +695,19 @@ class GRUDApp:
                         logger.error("Error while zipping", exc_info=sys.exc_info())
                         return
 
-                    if result > 1: # We created multiple parts
-                        for part in range(0, result):
-                            filename = f"{folders_to_zip[i]} part {part + 1}.zip"
-                            archives_to_send.append(filename)
-                            if not delete_files:
-                                shutil.copy(filename, download_path)
-                    else:
-                        filename = f"{folders_to_zip[i]}.zip"
-                        archives_to_send.append(filename)
+
+                    for archive in result:
+                        archives_to_send.append(archive)
                         if not delete_files:
                             shutil.copy(filename, download_path)
 
             self.files_compressed = None
+
+        for folder in folders_to_zip:
+            # If this fails, it is kind of a disaster for multiple
+            # reasons, even if we catch the exception. Just ignore
+            # exceptions for now until a solution is found.
+            shutil.rmtree(folder, ignore_errors=True)
 
         self.can_refresh = True
         # Remove zipped folders from the list
@@ -714,6 +721,7 @@ class GRUDApp:
 
         self.should_refresh_gui = True
 
+        self.files_to_send = len(archives_to_send)
 
         failed_archives = []
         if send_message and message[0:6] != "~TEST~": 
@@ -732,6 +740,8 @@ class GRUDApp:
                     logger.error(err)
                     printerror(err)
                     failed_archives.append(archive)
+
+                self.files_sent += 1
 
 
         for archive in archives_to_send:
@@ -951,10 +961,12 @@ class GRUDApp:
             src = os.path.join(self.temp_dir, file)
             dst = os.path.join(self.recovered, file)
 
+            if dst.endswith(".zip"):
+                dst = f"{dst[:-4]} (RECOVERED).zip"
+
             count = 1
             while os.path.exists(dst):
                 count += 1
-                
                 dst = os.path.join(self.recovered, file)
                 dst += f" ({count})"
 

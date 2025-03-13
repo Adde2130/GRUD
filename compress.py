@@ -32,7 +32,7 @@ def get_folder_size(path: str) -> int:
 # TODO: Make thread safe/stoppable from other threads
 #      MULTIPROCESSED COMPRESSION OF SPLIT ARCHIVES
 #      PERHAPS COMPRESSION IN C FOR FASTER SPEED?
-def compress_folder(path: str, size_limit: int, compressed_files=None, remove=True) -> int: # Returns number of archives made
+def compress_folder_old(path: str, size_limit: int, compressed_files=None, remove=True) -> int: # Returns number of archives made
     if size_limit == 0:
         size_limit = 0xFFFFFFFF # 4GB
 
@@ -92,7 +92,7 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, remove=Tr
 
     return archives
 
-def compress_new(path: str, size_limit: int, compressed_files=None, remove=False, verbose=False):
+def compress_folder(path: str, size_limit: int, compressed_files=None, verbose=False):
     if size_limit == 0:
         size_limit = 0xFFFFFFFF # 4GB
 
@@ -104,11 +104,12 @@ def compress_new(path: str, size_limit: int, compressed_files=None, remove=False
         if f.endswith(".slp")
     ]
 
-
     algo = zipfile.ZIP_BZIP2
     compression_ratio = 1 / 4
 
-    folder_size = os.path.getsize(path)
+    folder_size = 0
+    for file in os.listdir(path):
+        folder_size += os.path.getsize(os.path.join(path, file))
 
     # If we have to create more than one archive, just switch the
     # compression algorithm since we don't want too many parts
@@ -127,11 +128,12 @@ def compress_new(path: str, size_limit: int, compressed_files=None, remove=False
         file_size = os.path.getsize(file)
         archive_size = os.path.getsize(archive_name)
 
-        print(
-            f"ARCHIVE SIZE: \033[96;1m{round(archive_size / 1024 / 1024, 2)}\033[0mMB, "
-            f"FILE SIZE: \033[93;1m{round(file_size / 1024 / 1024, 2)}\033[0mMB",
-            f"COMPRESSED FILE SIZE: \033[91;1m{round(file_size / 1024 / 1024 * compression_ratio, 2)}\033[0mMB"
-        )
+        if verbose:
+            print(
+                f"ARCHIVE SIZE: \033[96;1m{round(archive_size / 1024 / 1024, 2)}\033[0mMB, "
+                f"FILE SIZE: \033[93;1m{round(file_size / 1024 / 1024, 2)}\033[0mMB",
+                f"COMPRESSED FILE SIZE: \033[91;1m{round(file_size / 1024 / 1024 * compression_ratio, 2)}\033[0mMB"
+            )
 
         
         if archive_size + file_size * compression_ratio > size_limit:
@@ -145,7 +147,7 @@ def compress_new(path: str, size_limit: int, compressed_files=None, remove=False
             archive = zipfile.ZipFile(archive_name, "w", algo, compresslevel=9) 
             archives.append(archive_name)
 
-        archive.write(file)
+        archive.write(file, arcname=os.path.basename(file))
         if compressed_files is not None:
             compressed_files.append(file)
 
@@ -162,12 +164,6 @@ def compress_new(path: str, size_limit: int, compressed_files=None, remove=False
         else:
             os.rename(old_archive_name, archive_name)
 
-    if remove:
-        # I know ignoring is bad but testing multiprocessing is a pain,
-        # and SU replays have already been fucked multiple times due to
-        # this rmtree function.
-        shutil.rmtree(path, ignore_errors=True)
-
     return archives
 
 def main():
@@ -182,7 +178,7 @@ def main():
         print("Invalid path")
         return
 
-    print(compress_new(path, 50 * 1024 * 1024, remove=False, verbose=True))
+    print(compress_new(path, 50 * 1024 * 1024, verbose=True))
 
 if __name__ == "__main__":
     main()
