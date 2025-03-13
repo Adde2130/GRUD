@@ -643,11 +643,6 @@ class GRUDApp:
         else:
             size_limit = 0
 
-        # Fix since the lib is broken right now
-        if Version(version_str("discord.py")) <= Version("2.4.0") and size_limit == 25 * 1024 * 1024:
-            size_limit = 10 * 1024 * 1024
-
-
         self.files_to_compress = []
         for folder in folders_to_zip:
             self.files_to_compress += [file for file in os.listdir(folder) if file.endswith(".slp")]
@@ -1231,3 +1226,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
