@@ -669,7 +669,7 @@ class GRUDApp:
                 ]
 
 
-                for i, task in enumerate(tasks):
+                for task in tasks:
                     # Wait for tasks to complete...
                     try:
                         result = task.result()
@@ -1198,10 +1198,10 @@ def main():
                 printerror(e)
 
         app = GRUDApp(
-                settings,
-                dev_state=dev_state,
-                gui=not args.naked
-            )
+            settings,
+            dev_state=dev_state,
+            gui=not args.naked
+        )
     else:
         printerror("Could not find settings.json")
         print("Creating settings.json")

@@ -104,18 +104,18 @@ def compress_folder(path: str, size_limit: int, compressed_files=None, verbose=F
         if f.endswith(".slp")
     ]
 
-    algo = zipfile.ZIP_BZIP2
-    compression_ratio = 1 / 4
 
-    folder_size = 0
-    for file in os.listdir(path):
-        folder_size += os.path.getsize(os.path.join(path, file))
+    folder_size = get_folder_size(path)
 
-    # If we have to create more than one archive, just switch the
-    # compression algorithm since we don't want too many parts
+    # If we have to create more than one archive, use LZMA
+    # compression algorithm since we don't want too many parts,
+    # even though LZMA is 10x slower
     if folder_size > size_limit * 4.5:
         algo = zipfile.ZIP_LZMA
         compression_ratio = 1 / 6
+    else:
+        algo = zipfile.ZIP_BZIP2
+        compression_ratio = 1 / 4
 
 
     archive_name = f"{path} part 1.zip"
