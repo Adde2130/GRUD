@@ -669,13 +669,13 @@ class GRUDApp:
                 ]
 
 
-                for task in tasks:
+                for i, task in enumerate(tasks):
                     # Wait for tasks to complete...
                     try:
                         result = task.result()
                     except Exception as e:
                         folder = os.path.basename(folders_to_zip[i])
-                        self.error_msg = \
+                        error_msg = \
                             f"Error thrown while zipping\n" \
                             f"{folder}\n\n" \
                             f"Please send the logs.log file\n" \
@@ -685,9 +685,7 @@ class GRUDApp:
                             f"( %AppData%/GRUD/.temp, a\n" \
                             f"hidden folder )" 
 
-                        self.state = "error_thrown"
-                        # Since the error is caught, log it explicitly
-                        logger.error("Error while zipping", exc_info=sys.exc_info())
+                        self.throw_error(error_msg, "Error while zipping", sys.exc_info())
                         return
 
 
@@ -1091,6 +1089,13 @@ class GRUDApp:
                 widget.configure(state=tk.NORMAL)
             else:
                 widget.config(state=tk.NORMAL)
+
+
+    def throw_error(self, msg, logger_msg, exc_info=False):
+        self.error_msg = msg
+        self.state = "error_thrown"
+        logger.error(logger_msg, exc_info=sys.exc_info())
+
 
     # TODO: same as enable_widget
     def disable_widget(self, widget):
