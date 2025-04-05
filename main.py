@@ -71,7 +71,9 @@ class LoggedCTk(customtkinter.CTk):
     def __init__(self, fg_color):
         super().__init__(fg_color=fg_color)
         
-        sys.stderr = self._LoggerStream(logger, sys.stderr)
+        # Check that stderr actually exists for cases when the program is ran without a terminal (pythonw.exe)
+        if sys.stderr and hasattr(sys.stderr, "write"):
+            sys.stderr = self._LoggerStream(logger, sys.stderr)
         
         self.report_callback_exception = self._log_tkinter_error
 
